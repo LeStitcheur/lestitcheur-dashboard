@@ -1,0 +1,48 @@
+appId: fr.lestitcheur.control
+productName: LeStitcheur Control
+directories:
+  output: release
+  buildResources: desktop
+files:
+  - dist/**/*
+  - server/**/*
+  - desktop/main.js
+  - desktop/remote-desktop.js
+  - desktop/updates.js
+  - desktop/terminal.js
+  - desktop/pty-process.js
+  - desktop/pty-host.cjs
+  - desktop/navigation.js
+  - desktop/social-windows.js
+  - desktop/social-surface.js
+  - desktop/preload.cjs
+  - desktop/icon.png
+  - package.json
+  - '!**/*.map'
+asar: true
+asarUnpack:
+  - node_modules/node-pty/**/*
+  - desktop/pty-host.cjs
+npmRebuild: false
+extraResources:
+  - from: desktop/prerequisites.ps1
+    to: prerequisites.ps1
+  - from: desktop/rdp-host.exe
+    to: rdp-host.exe
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: desktop/icon.ico
+  executableName: LeStitcheur Control
+nsis:
+  include: desktop/installer.nsh
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: LeStitcheur Control
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  artifactName: LeStitcheur-Control-Setup-${version}.${ext}

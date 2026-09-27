@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.local/
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+release/
+
+desktop/rdp-host.exe
+*.pfx
+*.p12
+*.pem
+*.key
+

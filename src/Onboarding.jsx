@@ -1,0 +1,9 @@
+import React,{useState} from 'react';
+import {FolderOpen,Check,Monitor} from 'lucide-react';
+import {api} from './api';
+
+export default function Onboarding({settings,onDone,platform}) {
+ const [folder,setFolder]=useState(settings.projectsRoot),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const label=({win32:'Windows',darwin:'macOS',linux:'Linux'})[platform]||'cet ordinateur';
+ return <section className="card first-run"><img src="/emblem.svg" alt="Emblème LeStitcheur"/><span className="eyebrow">BIENVENUE SUR {label.toUpperCase()}</span><h2>Un nouvel ordinateur.<br/>Ton espace à configurer.</h2><p>L’application est installée. Choisis ton dossier de projets ; tu pourras ensuite connecter tes services depuis les paramètres. Aucun compte personnel n’est préchargé.</p><form onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{onDone(await api('/settings',{projectsRoot:folder,setupComplete:true}));}catch(e){setError(e.message);}finally{setBusy(false);}}}><label>Dossier des projets<input value={folder} onChange={e=>setFolder(e.target.value)} required/></label>{window.desktopSetup&&<button type="button" className="button secondary" onClick={async()=>{try{const choice=await window.desktopSetup.chooseProjectsFolder();if(choice)setFolder(choice);}catch(e){setError(e.message);}}}><FolderOpen size={16}/>Parcourir</button>}<div className="first-run-info"><Monitor size={20}/><span>Terminal, projets, RDP et intégrations web disponibles. {platform==='win32'?'Laragon et FiveM se configurent séparément.':'Laragon, le lanceur FiveM Windows et le contrôle Spotify Windows restent propres à Windows ; utilise Spotify Connect ici.'}</span></div>{error&&<p className="inline-error">{error}</p>}<button className="button primary" disabled={busy}><Check size={16}/>{busy?'Configuration…':'Entrer dans mon espace'}</button></form></section>;
+}

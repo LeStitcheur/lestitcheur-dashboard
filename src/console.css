@@ -1,0 +1,20 @@
+.modal.ptero-console-dialog{width:1080px;max-width:calc(100vw - 32px);max-height:94vh;background:#17141b;border-color:#46333e}
+.ptero-console-dialog>header{background:#211923;border-bottom-color:#3a2a33}
+.ptero-console{min-width:0;padding:0 20px 16px}
+.console-toolbar{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:17px 0}
+.console-identity{display:flex;align-items:center;gap:10px;min-width:0}
+.console-server-icon{width:36px;height:36px;border:1px solid #563040;background:#36212b;border-radius:8px;display:grid;place-items:center;color:#ee899d;flex-shrink:0}
+.console-identity>div{min-width:0}.console-identity strong{display:block;font-size:12px;font-weight:600;overflow-wrap:anywhere}.console-identity span:not(.console-server-icon){display:block;font-size:10px;color:#9b8d9f;margin-top:5px}
+.console-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.console-connection{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;font-size:10px;color:#d5b580;white-space:nowrap;background:#30281f;border:1px solid #4c3c2c;border-radius:5px}
+.console-connection.connected{color:#93cda8;background:#213128;border-color:#344c3c}.console-connection.failed{color:#ef99ae;background:#38232f;border-color:#663e4d}
+.console-screen{position:relative;border:1px solid #3a2c3e;border-radius:8px 8px 0 0;background:#100f14;padding:12px 8px 10px 12px}
+.console-terminal{height:clamp(240px,48vh,560px);width:100%;min-width:0}
+.console-terminal .xterm{height:100%;padding:0}.console-terminal .xterm-viewport{border-radius:3px}.console-terminal .xterm:focus-visible{outline:none}
+.console-scroll-bottom{position:absolute;right:22px;bottom:13px;display:flex;align-items:center;gap:7px;border:1px solid #774151;border-radius:5px;padding:7px 10px;background:#41232f;color:#ffb5c1;font-size:10px;box-shadow:0 5px 12px #0005}
+.console-command{display:flex;align-items:center;gap:9px;padding:10px 11px;background:#231a27;border:1px solid #493040;border-top:0;border-radius:0 0 8px 8px}
+.console-command>svg{color:#f16887}.console-command input{flex:1;width:100%;background:transparent;border:0;color:#ebd9e9;padding:6px 3px;font-family:Consolas,'Courier New',monospace;font-size:12px;outline-offset:1px}.console-command input::placeholder{color:#8e7897}.console-command input:disabled{color:#807288}
+.console-footer{display:flex;justify-content:space-between;gap:12px;padding-top:11px;font-size:9px;line-height:1.6;color:#8f7e9a}.console-footer>span{display:flex;align-items:center;gap:6px}.console-footer>span:last-child{white-space:nowrap;color:#75657f}.console-footer i{height:3px;width:3px;background:#6b5878;border-radius:50%;margin:0 4px}.console-footer svg{color:#81bc98}
+.console-error{margin-bottom:12px;padding:10px 13px;border-radius:6px;font-size:11px;line-height:1.7;color:#efb1c0;background:#371e2b;border:1px solid #673546}
+.console-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;pointer-events:none;color:#706278}.console-empty strong{font-size:12px;color:#a797b2;font-weight:500}.console-empty span{font-size:10px;color:#75637f}
+@media(max-width:700px){.ptero-console-dialog{max-height:96vh!important}.ptero-console{padding:0 12px 13px}.console-toolbar{align-items:flex-start;flex-direction:column;gap:13px}.console-tools{width:100%;justify-content:flex-start}.console-tools>.button{margin-left:auto}.console-terminal{height:43vh;min-height:190px}.console-footer{flex-direction:column;gap:4px}.console-command .button{font-size:10px;padding:7px 9px}.remote-top{flex-wrap:wrap}.remote-top>.remote-console-button{margin-left:51px}.console-identity strong{font-size:13px}}
