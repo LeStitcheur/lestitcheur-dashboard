@@ -11,7 +11,7 @@ app.whenReady().then(async()=>{
  const {createApp}=await import(pathToFileURL(path.join(root,'server','index.js')));
  const {createTerminalPool}=await import(pathToFileURL(path.join(root,'desktop','terminal.js')));
  const {spawnPty}=await import(pathToFileURL(path.join(root,'desktop','pty-process.js')));
- const backend=await createApp({port:4324,desktop:true,dataDir:path.join(out,'settings')});
+ const backend=await createApp({requireAuth:false,port:4324,desktop:true,dataDir:path.join(out,'settings')});
  await backend.settings.update({setupComplete:true});
  server=backend.app.listen(4324,'127.0.0.1');
  window=new BrowserWindow({show:false,x:-20000,y:0,skipTaskbar:true,focusable:false,width:1480,height:1000,webPreferences:{preload:path.join(root,'desktop','preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});

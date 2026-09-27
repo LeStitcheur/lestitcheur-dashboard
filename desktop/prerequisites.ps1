@@ -60,10 +60,14 @@ function Invoke-PrerequisiteInstall($Winget,$Package){
 }
 function Install-Prerequisites {
  $packages=@(Get-Prerequisites);$results=@();$missing=@()
- foreach($package in $packages){if(Test-Prerequisite $package){Write-Host ('Deja present : '+$package.Name);$results+=@{id=$package.Id;status='present'}}else{$missing+=$package;Write-Host ('Absent : '+$package.Name)}}
+ $checked=0
+ foreach($package in $packages){$checked++;Write-Host ('[Detection '+$checked+'/'+$packages.Count+'] '+$package.Name);if(Test-Prerequisite $package){Write-Host ('Deja present : '+$package.Name);$results+=@{id=$package.Id;status='present'}}else{$missing+=$package;Write-Host ('Absent : '+$package.Name)}}
  if($missing.Count){
   try{$winget=Ensure-WinGet}catch{foreach($package in $missing){$results+=@{id=$package.Id;status='failed';error=$_.Exception.Message}};return $results}
+  $processed=0
   foreach($package in $missing){
+   $processed++;$started=Get-Date
+   Write-Host ('[Installation '+$processed+'/'+$missing.Count+'] '+$package.Name)
    Write-Host ('Installation : '+$package.Name)
    try{
     # Recheck after previous packages (Laragon may bundle development tools).
@@ -73,6 +77,7 @@ function Install-Prerequisites {
     if($code -notin @(0,3010)){throw ('WinGet a retourne le code '+$code)}
     if(!(Test-Prerequisite $package)){throw 'Installation terminee mais logiciel non detecte. Consulter le journal.'}
     $results+=@{id=$package.Id;status='installed';restartRequired=($code -eq 3010)}
+    Write-Host ('[Termine '+$processed+'/'+$missing.Count+'] '+$package.Name+' - '+[math]::Round(((Get-Date)-$started).TotalSeconds)+' secondes')
    }catch{$results+=@{id=$package.Id;status='failed';error=$_.Exception.Message};Write-Host ('Echec : '+$package.Name+' - '+$_.Exception.Message)}
   }
  }

@@ -4,7 +4,7 @@ const output=path.join(project,'.local','install-smoke'),profile=path.join(outpu
 const wait=async fn=>{const end=Date.now()+40000;while(!await fn()){if(Date.now()>end)throw Error('UI check timed out');await new Promise(r=>setTimeout(r,100));}};
 app.whenReady().then(async()=>{
  await fs.mkdir(output,{recursive:true});const {createApp}=await import(pathToFileURL(path.join(root,'server','index.js')));const {createRemoteDesktop}=await import(pathToFileURL(path.join(root,'desktop','remote-desktop.js')));
- backend=await createApp({port:4326,desktop:true,dataDir:profile});server=backend.app.listen(4326,'127.0.0.1');
+ backend=await createApp({requireAuth:false,port:4326,desktop:true,dataDir:profile});server=backend.app.listen(4326,'127.0.0.1');
  window=new BrowserWindow({show:false,x:-20000,y:0,width:1480,height:1000,skipTaskbar:true,focusable:false,webPreferences:{preload:path.join(root,'desktop','preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});window.showInactive();
  remote=await createRemoteDesktop({directory:profile,window,helper:packaged?path.join(project,'release','win-unpacked','resources','rdp-host.exe'):path.join(root,'desktop','rdp-host.exe'),scale:()=>screen.getDisplayMatching(window.getBounds()).scaleFactor});
  for(const action of ['status','save','remove','connect','disconnect','focus','fullscreen'])ipcMain.handle('remote:'+action,(_e,...args)=>remote[action](...args));ipcMain.on('remote:layout',(_e,data)=>remote.layout(data));

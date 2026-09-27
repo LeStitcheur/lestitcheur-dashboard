@@ -1,3 +1,4 @@
+import {createAccess} from './access.js';
 import express from 'express';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,13 +21,14 @@ import { createWorkspace } from './workspace.js';
 import { workspaceRoutes } from './workspace-routes.js';
 
 export const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.local'), dev = false, desktop = false, onSpotifyConnected, openSocial, terminalRunning = () => false } = {}) {
+export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.local'), dev = false, desktop = false, onSpotifyConnected, openSocial, terminalRunning = () => false, requireAuth = true } = {}) {
   const app = express();
   app.disable('x-powered-by');
   const origin = `http://127.0.0.1:${port}`;
   const token = randomBytes(32).toString('hex');
   const settings = await createSettings(dataDir);
   const workspace = await createWorkspace(dataDir);
+  const access=requireAuth?await createAccess({directory:dataDir,origin}):null;
   const jobs = createJobs(entry=>workspace.notify({...entry,source:entry.details?.source||'activity'}));
   const projects = createProjects(settings, jobs, APP_ROOT);
   const services = createServices(settings, jobs);
@@ -55,9 +57,12 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
     res.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'${dev ? " 'unsafe-inline'" : ''}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.scdn.co https://mosaic.scdn.co https://image-cdn-ak.spotifycdn.com https://image-cdn-fa.spotifycdn.com; connect-src 'self'${dev ? ` ws://127.0.0.1:${port}` : ''}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`);
     next();
   });
-  app.use('/api', (req, res, next) => {
+  app.get('/auth/discord/callback', async (req,res)=>{res.setHeader('Cache-Control','no-store');try{await access?.callback(req.query);res.type('html').send('<!doctype html><meta charset="utf-8"><title>Discord</title><p>Connexion réussie. Tu peux fermer cet onglet et revenir au dashboard.</p>');}catch{res.status(403).type('html').send('<!doctype html><meta charset="utf-8"><title>Discord</title><p>Connexion refusée ou expirée. Seul le propriétaire peut ouvrir le dashboard. Recommence depuis l’application.</p>');}});
+  app.use('/api', async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     if (!requestAllowed(req, port)) return res.status(403).json({ error: 'Origine refusée.' });
+    if(req.path==='/access/status'&&req.method==='GET')return res.json({...(access? (await access.ensure(),access.publicState()):{authorized:true}),token});
+    if(access&&!req.path.startsWith('/access/')&&!await access.ensure())return res.status(401).json({error:'Connexion Discord requise.'});
     if (req.path === '/bootstrap' && req.method === 'GET') return next();
     const supplied = Buffer.from(req.get('X-Panel-Token') || '');
     if (supplied.length !== token.length || !timingSafeEqual(supplied, Buffer.from(token))) return res.status(403).json({ error: 'Session expirée. Recharge le panel.' });
@@ -66,6 +71,9 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
   });
   app.use('/api/backup/restore',express.json({limit:'3mb'}));
   app.use(express.json({ limit: '24kb' }));
+  app.post('/api/access/configure',async(req,res)=>res.json(await access.configure(req.body.secret)));
+  app.post('/api/access/begin',(_req,res)=>res.json(access.begin()));
+  app.post('/api/access/logout',async(_req,res)=>{await access.logout();res.json({});});
   const workspaceMonitor = workspaceRoutes(app,{workspace,settings,services,projects,jobs,ptero,cloud,music,terminalRunning,consoles});
   app.get('/api/bootstrap', (_req, res) => res.json({ app: 'lestitcheur-control', desktop, platform:process.platform, capabilities:{windowsServices:process.platform==='win32',desktopSpotify:process.platform==='win32'}, token, settings: settings.public(), spotifyRedirectUri: spotify.redirectUri }));
   app.get('/api/state', async (_req, res) => res.json({ system: system(), terminalRunning: terminalRunning(), services: await services.status(), activities: jobs.activities(), jobs: jobs.list().map(({ output, ...job }) => job) }));
@@ -74,6 +82,7 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
   app.get('/api/codex', async (_req, res) => res.json(await codexSummary()));
   app.post('/api/settings', async (req, res) => { const previous = settings.get(); await settings.update(req.body); if (previous.pteroUrl !== settings.get().pteroUrl || previous.pteroKey !== settings.get().pteroKey) consoles.disconnectAll(); ptero.invalidate(); cloud.invalidate(); jobs.addActivity('Paramètres enregistrés', 'success'); res.json(settings.public()); });
   app.post('/api/terminal', async (req, res) => { await terminal(settings.get().projectsRoot, req.body.admin === true); jobs.addActivity(`Terminal ${req.body.admin ? 'administrateur' : 'PowerShell'} ouvert`); res.json({}); });
+  app.get('/api/projects/:name/release-plan', async (req,res)=>res.json(await projects.releasePlan(req.params.name)));
   app.get('/api/projects/:name/deploy-plan', async (req, res) => res.json(await projects.plan(req.params.name)));
   app.post('/api/projects/:name/action', async (req, res) => res.json(await projects.action(req.params.name, req.body.action, req.body)));
   app.post('/api/services/start', (req, res) => res.json(services.start(req.body.target)));
@@ -130,7 +139,7 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
     res.status(400).json({ error: message });
   });
   jobs.addActivity('LeStitcheur Control est prêt', 'success');
-  return { app, jobs, settings, services, workspace, close: () => {workspaceMonitor.close();consoles.disconnectAll();} };
+  return { app, access, jobs, settings, services, workspace, close: () => {workspaceMonitor.close();consoles.disconnectAll();} };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 4317);

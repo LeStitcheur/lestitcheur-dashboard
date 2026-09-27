@@ -14,3 +14,7 @@ desktop/rdp-host.exe
 *.pem
 *.key
 
+
+Thumbs.db
+Desktop.ini
+

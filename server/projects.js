@@ -1,3 +1,4 @@
+import {releasePlan,githubCredential,githubClient,publishRelease} from './github-release.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
@@ -52,6 +53,7 @@ export function createProjects(settings, jobs, appRoot) {
       return result.sort((a, b) => a.name.localeCompare(b.name));
     },
     async plan(name) { return deployPlan(await resolve(name)); },
+    async releasePlan(name) { const cwd=await resolve(name);return releasePlan(cwd,await deployPlan(cwd)); },
     async action(name, action, data) {
       const cwd = await resolve(name, ['rename', 'delete'].includes(action));
       const lock = cwd.toLowerCase();
@@ -68,6 +70,16 @@ export function createProjects(settings, jobs, appRoot) {
       if (action === 'delete') {
         if (data.confirm !== name) throw new Error('Recopie le nom du dossier pour confirmer.');
         await recycle(cwd); jobs.addActivity(`Dossier déplacé dans la Corbeille · ${name}`, 'success'); return {};
+      }
+      if(action==='release'){
+        const plan=await releasePlan(cwd,await deployPlan(cwd));
+        if(data.fingerprint!==plan.fingerprint)throw Error('Le projet ou les fichiers ont changé. Vérifie à nouveau la release.');
+        return jobs.create('Release GitHub · '+name,async log=>{
+          const current=await releasePlan(cwd,await deployPlan(cwd));
+          if(current.fingerprint!==plan.fingerprint)throw Error('Les fichiers ont changé avant publication.');
+          const token=await githubCredential(cwd);
+          await publishRelease({cwd,plan,client:githubClient(token),log});
+        },lock);
       }
       if (action === 'deploy') {
         const plan = await deployPlan(cwd);

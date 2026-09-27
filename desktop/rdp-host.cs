@@ -18,6 +18,7 @@ sealed class RdpHost : Form {
     [DllImport("user32.dll")] static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
     [DllImport("user32.dll")] static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
     [DllImport("user32.dll")] static extern bool MoveWindow(IntPtr window,int x,int y,int width,int height,bool repaint);
+    [DllImport("user32.dll", SetLastError=true)] static extern bool SetWindowPos(IntPtr window,IntPtr after,int x,int y,int width,int height,uint flags);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr window,int command);
     [DllImport("user32.dll")] static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window,out uint process);
@@ -93,7 +94,14 @@ sealed class RdpHost : Form {
                 case "layout":
                     int width=Math.Max(100,Math.Min(16000,Number(d,"width"))),height=Math.Max(100,Math.Min(16000,Number(d,"height")));
                     MoveWindow(Handle,Number(d,"x"),Number(d,"y"),width,height,true);
-                    ShowWindow(Handle,d.ContainsKey("visible")&&(bool)d["visible"]?4:0);break;
+                    bool visible=d.ContainsKey("visible")&&(bool)d["visible"];
+                    if(visible){
+                        control.Visible=true;
+                        // Chromium has its own child HWND. Place the RDP host above it on every layout.
+                        if(!SetWindowPos(Handle,IntPtr.Zero,Number(d,"x"),Number(d,"y"),width,height,0x0010|0x0040))throw new Exception("Positionnement du bureau impossible.");
+                        control.BringToFront();control.Invalidate(true);
+                    }else{ShowWindow(Handle,0);}
+                    break;
                 case "focus": control.Focus();break;
                 case "disconnect": Close();break;
                 case "probe": Send(new {phase="ready",version=(string)client.Version,embedded=true});break;

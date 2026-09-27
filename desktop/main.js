@@ -1,3 +1,4 @@
+import {createNetworkDiscovery} from './network-discovery.js';
 import { app, BrowserWindow, WebContentsView, ipcMain, Menu, Tray, dialog, shell, nativeTheme, clipboard, screen } from 'electron';
 import { spawnPty } from './pty-process.js';
 import { createTerminalPool } from './terminal.js';
@@ -66,8 +67,15 @@ else {
       backgroundColor: '#090b0e', autoHideMenuBar: true, titleBarStyle: 'hidden', titleBarOverlay: { color: '#0d1014', symbolColor: '#e9eaed', height: 36 },
       webPreferences: { preload: path.join(app.getAppPath(), 'desktop', 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, spellcheck: false, backgroundThrottling: true } });
     socialSurface = createSocialSurface({ window, View: WebContentsView, accounts: () => [...backend.settings.get().socialAccounts, { id: 'discord-personal', platform: 'discord' }], protect: protectSocialContents });
-    const trusted = event => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url.startsWith(ORIGIN + '/');
+    const localSender = event => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url.startsWith(ORIGIN + '/');
+    const trusted=event=>localSender(event)&&(!backend.access||backend.access.allowed());
+    ipcMain.handle('access:open',async event=>{if(!localSender(event))throw Error('Accès refusé.');const {url}=backend.access.begin();await shell.openExternal(url);});
     ipcMain.handle('setup:folder',async event=>{if(!trusted(event))throw Error('Accès refusé.');const result=await dialog.showOpenDialog(window,{title:'Choisir ton dossier de projets',defaultPath:backend.settings.get().projectsRoot,properties:['openDirectory','createDirectory']});return result.canceled?null:result.filePaths[0];});
+    const discovery=createNetworkDiscovery({onChange:state=>{if(!window.isDestroyed())window.webContents.send('remote:scan-status',state);}});
+    for(const action of ['scan','cancel','status'])ipcMain.handle('remote:network-'+action,(event)=>{if(!trusted(event))throw Error('Accès refusé.');return discovery[action]();});
+    let wasAuthorized=backend.access?.allowed()??true;
+    const accessWatch=setInterval(()=>{const authorized=backend.access?.allowed()??true;if(wasAuthorized&&!authorized){remoteDesktop?.disconnect();socialSurface?.close();socialWindows.closeAll();discovery.cancel();}wasAuthorized=authorized;},1000);accessWatch.unref();
+    app.on('before-quit',()=>{clearInterval(accessWatch);discovery.cancel();});
     remoteDesktop=await createRemoteDesktop({directory:app.getPath('userData'),window,helper:app.isPackaged?path.join(process.resourcesPath,'rdp-host.exe'):path.join(app.getAppPath(),'desktop','rdp-host.exe'),scale:()=>screen.getDisplayMatching(window.getBounds()).scaleFactor});
     for(const action of ['status','save','remove','connect','disconnect','focus','fullscreen'])ipcMain.handle('remote:'+action,(event,...args)=>{if(!trusted(event))throw Error('Accès refusé.');return remoteDesktop[action](...args);});
     ipcMain.on('remote:layout',(event,input)=>{if(trusted(event))remoteDesktop.layout(input);});

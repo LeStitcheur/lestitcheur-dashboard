@@ -14,6 +14,7 @@ Function PrerequisitesPage
 FunctionEnd
 !macroend
 !macro customInstall
+ SetDetailsView show
  DetailPrint "Verification des outils (FiveM exclu)..."
  prereq_retry:
  ${DisableX64FSRedirection}

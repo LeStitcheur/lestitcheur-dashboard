@@ -8,6 +8,7 @@ files:
   - server/**/*
   - desktop/main.js
   - desktop/remote-desktop.js
+  - desktop/network-discovery.js
   - desktop/updates.js
   - desktop/terminal.js
   - desktop/pty-process.js

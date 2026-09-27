@@ -13,7 +13,7 @@ test('local API integration: session token, origin, content type, configuration 
   await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
   const port = probe.address().port;
   await new Promise(resolve => probe.close(resolve));
-  const { app, close, workspace } = await createApp({ port, dataDir: directory });
+  const { app, close, workspace } = await createApp({requireAuth:false, port, dataDir: directory });
   const server = app.listen(port, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   t.after(async () => { close(); await workspace.flush(); await new Promise(resolve => server.close(resolve)); assert.equal(path.dirname(path.resolve(directory)), parent); await fs.rm(directory, { recursive: true, force: true }); });

@@ -1,3 +1,13 @@
+## Version 2.6 : accès Discord, réseau et publication
+
+L’accès au dashboard est réservé au compte Discord propriétaire `904012939206471710`. Dans l’application Discord Developer `1536996866993037364`, enregistrer la redirection `http://127.0.0.1:4317/auth/discord/callback`. Au premier lancement sur chaque PC, saisir le Client Secret dans l’écran local de configuration (jamais dans Git ou les notes de release). Le navigateur par défaut assure la connexion OAuth ; les jetons et le secret sont chiffrés avec Windows DPAPI dans le profil utilisateur. La session est vérifiée au redémarrage et renouvelée avec Discord. Une indisponibilité réseau ou une révocation peut imposer une nouvelle connexion. Ce contrôle ne prétend pas résister à un administrateur local qui modifierait le code de cette application open source.
+
+Dans Mes projets, **Push GitHub** envoie le commit existant d’un dépôt propre. **Publier une release** prépare les fichiers de `release/` correspondant à la version du `package.json`, affiche leur liste, crée/reprend un brouillon, affiche les octets et pourcentages transmis, vérifie les empreintes SHA-256 distantes puis publie. Configurer Git Credential Manager pour GitHub, créer un commit et utiliser Push GitHub avant la release. Les releases déjà publiques et les tags désignant un autre commit ne sont pas écrasés.
+
+Le bouton **Scanner mon réseau** recherche à la demande les appareils répondant au protocole RDP sur 3389 : sous-réseaux IPv4 privés directement connectés, limités à la tranche /24 locale pour un grand réseau et à quatre interfaces. Les résultats proposent un bouton de connexion et un champ de compte distant. Le scan n’active pas RDP sur les appareils ; un port RDP ouvert ne signifie pas que le compte est autorisé. Les VPS, les réseaux IPv6 et les ports personnalisés restent configurables manuellement.
+
+L’installateur affiche les étapes de détection et d’installation, le nom du logiciel, les sorties WinGet et la durée de chaque installation. Les installateurs tiers ne fournissant pas tous un pourcentage, aucun pourcentage d’installation fictif n’est affiché.
+
 ## Télécharger
 
 L’installateur Windows est disponible dans les [releases GitHub](https://github.com/LeStitcheur/lestitcheur-dashboard/releases). Télécharger le fichier `LeStitcheur-Control-Setup-2.5.1.exe`, puis suivre l’assistant. Les fichiers `.blockmap` et `latest.yml` servent aux mises à jour et ne sont pas nécessaires à une installation manuelle.
@@ -168,4 +178,5 @@ Intégrations v2 : [session média Windows](https://learn.microsoft.com/en-us/uw
 La vue d’ensemble présente les quotas Codex utilisés et restants, leurs dates de réinitialisation et cinq projets locaux récemment utilisés, juste sous la bannière. Le relevé se renouvelle chaque minute lorsque la page est visible. Les quotas concernent tout le compte, pas uniquement ce dashboard.
 
 Codex doit être installé et connecté sur ce PC. L’intégration utilise son exécutable local et les lectures `account/rateLimits/read` et `thread/list` de l’[App Server officiel](https://learn.chatgpt.com/docs/app-server). Elle ne démarre aucune tâche et ne lit pas le fichier d’authentification. La liste regroupe les dossiers des 200 dernières tâches non archivées par date de mise à jour ; les métadonnées locales de l’application fournissent les noms des projets et excluent les conversations sans projet lorsqu’elles sont disponibles. Les erreurs et valeurs inconnues sont affichées explicitement. Aucun relevé n’est exporté vers un service tiers par le dashboard.
+
 
