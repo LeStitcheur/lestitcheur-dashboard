@@ -1,3 +1,4 @@
+import {createGithub} from './github.js';
 import {createAccess} from './access.js';
 import express from 'express';
 import os from 'node:os';
@@ -40,6 +41,7 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
   const cloud = createCloud(settings, jobs, dataDir);
   const discord = createDiscord(settings, jobs);
   const codexSummary = createCodexSummary();
+  const github=createGithub({cwd:dataDir});
   let lastCpu = os.cpus();
   let lastCpuPercent = 0;
   let lastCpuAt = Date.now();
@@ -54,7 +56,7 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
   app.use((req, res, next) => {
     if (req.headers.host !== `127.0.0.1:${port}`) return res.status(403).json({ error: 'Accès local uniquement.' });
     res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'no-referrer');
-    res.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'${dev ? " 'unsafe-inline'" : ''}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.scdn.co https://mosaic.scdn.co https://image-cdn-ak.spotifycdn.com https://image-cdn-fa.spotifycdn.com; connect-src 'self'${dev ? ` ws://127.0.0.1:${port}` : ''}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`);
+    res.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'${dev ? " 'unsafe-inline'" : ''}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cdn.discordapp.com https://avatars.githubusercontent.com https://i.scdn.co https://mosaic.scdn.co https://image-cdn-ak.spotifycdn.com https://image-cdn-fa.spotifycdn.com; connect-src 'self'${dev ? ` ws://127.0.0.1:${port}` : ''}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`);
     next();
   });
   app.get('/auth/discord/callback', async (req,res)=>{res.setHeader('Cache-Control','no-store');try{await access?.callback(req.query);res.type('html').send('<!doctype html><meta charset="utf-8"><title>Discord</title><p>Connexion réussie. Tu peux fermer cet onglet et revenir au dashboard.</p>');}catch{res.status(403).type('html').send('<!doctype html><meta charset="utf-8"><title>Discord</title><p>Connexion refusée ou expirée. Seul le propriétaire peut ouvrir le dashboard. Recommence depuis l’application.</p>');}});
@@ -77,6 +79,8 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
   const workspaceMonitor = workspaceRoutes(app,{workspace,settings,services,projects,jobs,ptero,cloud,music,terminalRunning,consoles});
   app.get('/api/bootstrap', (_req, res) => res.json({ app: 'lestitcheur-control', desktop, platform:process.platform, capabilities:{windowsServices:process.platform==='win32',desktopSpotify:process.platform==='win32'}, token, settings: settings.public(), spotifyRedirectUri: spotify.redirectUri }));
   app.get('/api/state', async (_req, res) => res.json({ system: system(), terminalRunning: terminalRunning(), services: await services.status(), activities: jobs.activities(), jobs: jobs.list().map(({ output, ...job }) => job) }));
+  app.get('/api/github',async(req,res)=>res.json(await github.list(req.query.page||1)));
+  app.get('/api/github/:owner/:repo',async(req,res)=>res.json(await github.details(req.params.owner,req.params.repo)));
   app.get('/api/projects', async (_req, res) => res.json(await projects.list()));
   app.get('/api/settings', (_req, res) => res.json(settings.public()));
   app.get('/api/codex', async (_req, res) => res.json(await codexSummary()));

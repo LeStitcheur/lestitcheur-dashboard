@@ -13,13 +13,14 @@ sealed class RdpControl : AxHost {
 }
 
 sealed class RdpHost : Form {
-    [DllImport("user32.dll", SetLastError=true)] static extern IntPtr SetParent(IntPtr child, IntPtr parent);
+    [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr window, ref Point point);
+    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr window);
     [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr child);
     [DllImport("user32.dll")] static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
     [DllImport("user32.dll")] static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
-    [DllImport("user32.dll")] static extern bool MoveWindow(IntPtr window,int x,int y,int width,int height,bool repaint);
-    [DllImport("user32.dll", SetLastError=true)] static extern bool SetWindowPos(IntPtr window,IntPtr after,int x,int y,int width,int height,uint flags);
+        [DllImport("user32.dll", SetLastError=true)] static extern bool SetWindowPos(IntPtr window,IntPtr after,int x,int y,int width,int height,uint flags);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr window,int command);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window,out uint process);
     [DllImport("user32.dll")] static extern IntPtr GetWindowDpiAwarenessContext(IntPtr window);
@@ -29,7 +30,8 @@ sealed class RdpHost : Form {
     readonly IntPtr parent;
     readonly uint parentPid;
     dynamic client;
-    bool started,closing;
+    bool started,closing,wantsVisible;
+    int surfaceX,surfaceY,surfaceWidth=100,surfaceHeight=100;
     string phase="ready";
     int lastState=-1;
     readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
@@ -42,9 +44,10 @@ sealed class RdpHost : Form {
         FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;AutoScaleMode=AutoScaleMode.None;
         StartPosition=FormStartPosition.Manual;Location=new Point(-20000,-20000);Size=new Size(900,600);BackColor=Color.FromArgb(11,18,27);
         control.Dock=DockStyle.Fill;Controls.Add(control);
-        timer.Interval=400;timer.Tick+=delegate {
+        timer.Interval=40;timer.Tick+=delegate {
             uint owner;GetWindowThreadProcessId(parent,out owner);
             if(!IsWindow(parent)||owner!=parentPid){Close();return;}
+            SyncSurface();
             if(client==null||!started)return;
             try { int state=(int)client.Connected;if(state!=lastState){lastState=state;phase=state==1?"connected":state==2?"connecting":"disconnected";Send(new {phase=phase,extendedReason=state==0?(int)client.ExtendedDisconnectReason:0});} } catch { }
         };
@@ -53,8 +56,11 @@ sealed class RdpHost : Form {
         base.OnLoad(e);
         try {
             long style=GetWindowLongPtr(Handle,-16).ToInt64();
-            SetWindowLongPtr(Handle,-16,new IntPtr((style & ~unchecked((long)0x80000000)) | 0x40000000 | 0x04000000));
-            SetParent(Handle,parent);
+            // An owned popup is composed independently from Chromium's no-redirection surface.
+            // A WS_CHILD HWND can report visible while Chromium completely covers its pixels.
+            SetWindowLongPtr(Handle,-16,new IntPtr((style & ~0x40000000L) | 0x80000000L | 0x04000000L));
+            SetWindowLongPtr(Handle,-8,parent);
+            SetWindowPos(Handle,IntPtr.Zero,0,0,0,0,0x0020|0x0010|0x0004|0x0002|0x0001);
             if(GetParent(Handle)!=parent)throw new Exception("Intégration de la fenêtre impossible.");
             ShowWindow(Handle,0);
             client=control.Client;
@@ -72,6 +78,18 @@ sealed class RdpHost : Form {
             Send(new {phase="ready",version=(string)client.Version,embedded=GetParent(Handle)==parent});timer.Start();
             var reader=new Thread(ReadInput);reader.IsBackground=true;reader.Start();
         } catch(Exception ex) { Send(new {phase="error",message="Le composant Bureau à distance Windows est indisponible.",code=ex.HResult});Close(); }
+    }
+    protected override bool ShowWithoutActivation { get { return true; } }
+    void SyncSurface() {
+        // Owned windows automatically stay above their owner, without being always-on-top.
+        // Track native moves as well as DOM scrolling; the owner may move without a resize event.
+        bool show=wantsVisible&&IsWindowVisible(parent)&&!IsIconic(parent);
+        if(!show){if(Visible)Hide();return;}
+        Point origin=new Point(surfaceX,surfaceY);
+        if(!ClientToScreen(parent,ref origin))return;
+        bool changed=Left!=origin.X||Top!=origin.Y||Width!=surfaceWidth||Height!=surfaceHeight;
+        if(changed)SetWindowPos(Handle,IntPtr.Zero,origin.X,origin.Y,surfaceWidth,surfaceHeight,0x0010|0x0004);
+        if(!Visible){Visible=true;control.Visible=true;}
     }
     void ReadInput() {
         try {string line;while((line=Console.ReadLine())!=null){if(line.Length>20000)continue;var data=json.Deserialize<Dictionary<string,object>>(line);BeginInvoke(new Action(()=>HandleMessage(data)));}}catch { }
@@ -92,19 +110,15 @@ sealed class RdpHost : Form {
                     client.DesktopWidth=1440;client.DesktopHeight=900;client.ColorDepth=32;
                     started=true;phase="connecting";Send(new {phase=phase});client.Connect();break;
                 case "layout":
-                    int width=Math.Max(100,Math.Min(16000,Number(d,"width"))),height=Math.Max(100,Math.Min(16000,Number(d,"height")));
-                    MoveWindow(Handle,Number(d,"x"),Number(d,"y"),width,height,true);
-                    bool visible=d.ContainsKey("visible")&&(bool)d["visible"];
-                    if(visible){
-                        control.Visible=true;
-                        // Chromium has its own child HWND. Place the RDP host above it on every layout.
-                        if(!SetWindowPos(Handle,IntPtr.Zero,Number(d,"x"),Number(d,"y"),width,height,0x0010|0x0040))throw new Exception("Positionnement du bureau impossible.");
-                        control.BringToFront();control.Invalidate(true);
-                    }else{ShowWindow(Handle,0);}
+                    surfaceWidth=Math.Max(100,Math.Min(16000,Number(d,"width")));
+                    surfaceHeight=Math.Max(100,Math.Min(16000,Number(d,"height")));
+                    surfaceX=Number(d,"x");surfaceY=Number(d,"y");
+                    wantsVisible=d.ContainsKey("visible")&&(bool)d["visible"];
+                    SyncSurface();
                     break;
                 case "focus": control.Focus();break;
                 case "disconnect": Close();break;
-                case "probe": Send(new {phase="ready",version=(string)client.Version,embedded=true});break;
+                case "probe": Send(new {phase="diagnostic",embedded=GetParent(Handle)==parent,ownedPopup=(GetWindowLongPtr(Handle,-16).ToInt64()&0x40000000L)==0,hostVisible=IsWindowVisible(Handle),controlVisible=IsWindowVisible(control.Handle),managedVisible=Visible,x=Left,y=Top,width=ClientSize.Width,height=ClientSize.Height,controlWidth=control.Width,controlHeight=control.Height});break;
             }
         } catch(Exception ex){d.Remove("password");Send(new {phase="error",message="La connexion RDP a échoué. Vérifie les paramètres et l’accès au serveur.",code=ex.HResult});}
     }

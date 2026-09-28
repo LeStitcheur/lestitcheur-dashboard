@@ -9,9 +9,9 @@ export default function RemoteDesktop({suspended,notice}) {
  useEffect(()=>{if(!bridge)return;bridge.status().then(setState).catch(e=>notice(e.message,'error'));const stop=bridge.onStatus(setState);return()=>{stop();bridge.disconnect().catch(()=>{});};},[]);
  useEffect(()=>{
    if(!bridge||!slot.current)return;
-   const layout=()=>{const rect=slot.current.getBoundingClientRect();bridge.layout({visible:!suspended&&!document.hidden,rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}});};
-   const observer=new ResizeObserver(layout);observer.observe(slot.current);window.addEventListener('resize',layout);window.addEventListener('scroll',layout,true);document.addEventListener('visibilitychange',layout);layout();
-   return()=>{observer.disconnect();window.removeEventListener('resize',layout);window.removeEventListener('scroll',layout,true);document.removeEventListener('visibilitychange',layout);bridge.layout({visible:false});};
+   const layout=()=>{const rect=slot.current.getBoundingClientRect();bridge.layout({visible:!suspended,rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}});};
+   const observer=new ResizeObserver(layout);observer.observe(slot.current);window.addEventListener('resize',layout);window.addEventListener('scroll',layout,true);layout();
+   return()=>{observer.disconnect();window.removeEventListener('resize',layout);window.removeEventListener('scroll',layout,true);bridge.layout({visible:false});};
  },[state.activeId,suspended]);
  useEffect(()=>{if(!bridge?.onScan)return;bridge.scanStatus().then(setScan).catch(()=>{});const stop=bridge.onScan(setScan);return()=>{stop();bridge.cancelScan().catch(()=>{});};},[]);
  async function selectDevice(device){setBusy(true);try{let profile=state.profiles.find(p=>p.host===device.host&&p.port===3389);if(!profile){const next=await bridge.save({...blank,name:device.name,host:device.host});setState(next);profile=next.profiles.find(p=>p.host===device.host);}setSelected(profile.id);setPassword('');}catch(e){notice(e.message,'error');}finally{setBusy(false);}}

@@ -1,10 +1,11 @@
-import React,{useEffect,useState} from 'react';
+import React,{createContext,useEffect,useState} from 'react';
 import {api,setToken} from './api.js';
+export const DiscordIdentity=createContext(null);
 export default function AccessGate({children}){
  const [status,setStatus]=useState(null),[secret,setSecret]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  async function refresh(){try{const response=await fetch('/api/access/status');if(!response.ok)throw Error('Connexion au service local impossible.');const state=await response.json();setToken(state.token);setStatus(state);}catch(e){setStatus(null);setError(e.message);}}
  useEffect(()=>{refresh();const timer=setInterval(refresh,5000);return()=>clearInterval(timer);},[]);
  async function login(){setError('');setBusy(true);try{if(window.desktopAccess)await window.desktopAccess.login();else{const {url}=await api('/access/begin',{});window.open(url,'_blank','noopener,noreferrer');}}catch(e){setError(e.message);}finally{setBusy(false);}}
- if(status?.authorized)return children;
+ if(status?.authorized)return <DiscordIdentity.Provider value={status.user}>{children}</DiscordIdentity.Provider>;
  return <main className="first-run" style={{maxWidth:700,margin:'80px auto',padding:30}}><h1>Ton dashboard. Ton compte Discord.</h1><p>Connexion réservée au compte propriétaire. L’autorisation s’ouvre dans ton navigateur par défaut et la session est conservée dans le coffre Windows.</p>{error&&<p className="inline-error">{error}</p>}{!status?<p>Vérification de la session…</p>:<>{!status.configured&&<form onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{await api('/access/configure',{secret});setSecret('');await refresh();}catch(e){setError(e.message);}finally{setBusy(false);}}}><h2>Configuration Discord de ce PC</h2><p>Dans Discord Developer Portal, application {status.clientId}, ajoute cette redirection dans OAuth2 :</p><code>{status.redirectUri}</code><label>Client Secret<input type="password" value={secret} onChange={e=>setSecret(e.target.value)} autoComplete="off" required/><small>Stocké chiffré sur ce PC, jamais inclus dans l’installateur ni envoyé à GitHub.</small></label><button className="button primary" disabled={busy}>Enregistrer</button></form>}{status.configured&&<button className="button primary" onClick={login} disabled={busy}>Se connecter avec Discord</button>}<p>Compte autorisé : {status.ownerId}</p></>}</main>;
 }

@@ -36,18 +36,19 @@ export function createProjects(settings, jobs, appRoot) {
           const pkg = await packageInfo(cwd);
           const info = await fs.stat(cwd);
           const isGit = existsSync(path.join(cwd, '.git'));
-          let branch = '', deployable = false, changedFiles = [], lastCommit = '', siteUrl = '';
+          let repository = '', branch = '', deployable = false, changedFiles = [], lastCommit = '', siteUrl = '';
           if (isGit) {
             branch = await git(cwd, ['branch', '--show-current']).catch(() => '');
             const remotes = await git(cwd, ['remote', 'get-url', '--push', '--all', 'origin']).catch(() => '');
             deployable = githubRemote(remotes);
+            if(deployable)repository=remotes.replace(/^(?:https:\/\/github\.com\/|git@github\.com:)/,'').replace(/\.git$/,'');
             changedFiles = (await git(cwd, ['status', '--porcelain']).catch(()=> '')).split(/\r?\n/).filter(Boolean).slice(0,100);
             lastCommit = await git(cwd, ['log', '-1', '--format=%h · %s']).catch(()=> '');
           }
           try { const url=new URL(pkg?.homepage);if(['http:','https:'].includes(url.protocol)&&!url.username&&!url.password)siteUrl=url.href; } catch {}
           const deps = { ...pkg?.dependencies, ...pkg?.devDependencies };
           const stack = deps.next ? 'Next.js' : deps.react ? 'React' : deps['discord.js'] ? 'Discord.js' : pkg ? 'Node.js' : existsSync(path.join(cwd, 'pyproject.toml')) || existsSync(path.join(cwd, 'requirements.txt')) ? 'Python' : 'Dossier';
-          result.push({ name: entry.name, path: cwd, stack, description: pkg?.description || '', git: isGit, branch, changedFiles, lastCommit, siteUrl, deployable, scripts: Object.keys(pkg?.scripts || {}), modified: info.mtime.toISOString(), protected: cwd.toLowerCase() === appRoot.toLowerCase() });
+          result.push({ name: entry.name, path: cwd, stack, description: pkg?.description || '', git: isGit, repository, branch, changedFiles, lastCommit, siteUrl, deployable, scripts: Object.keys(pkg?.scripts || {}), modified: info.mtime.toISOString(), protected: cwd.toLowerCase() === appRoot.toLowerCase() });
         } catch { /* Junctions, unavailable folders and invalid names are not managed. */ }
       }
       return result.sort((a, b) => a.name.localeCompare(b.name));
