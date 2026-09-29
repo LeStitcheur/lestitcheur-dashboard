@@ -91,3 +91,20 @@ test('personal Discord uses one isolated client panel and cannot inherit social 
   assert.throws(()=>surface.refresh('activity'));
   surface.close();assert.equal(children.length,0);
 });
+
+test('publishing switches to one isolated panel and restores monitoring on return',()=>{
+ const {surface,children}=fixture();const id=DEFAULT_ACCOUNTS[0].id;
+ surface.mount(id);const old=children.map(v=>v.webContents);
+ surface.mount(id,'publish');assert.equal(children.length,1);assert.ok(old.every(v=>v.destroyed));
+ assert.equal(surface.snapshot().panels[0].target,'publish');assert.match(children[0].webContents.url,/tiktokstudio\/upload$/);
+ assert.equal(children[0].options.webPreferences.partition,'persist:social-'+id);
+ surface.mount(id);assert.equal(children.length,2);surface.close();
+});
+
+test('creative services have isolated persistent partitions and close all native content',async()=>{
+ const {CREATOR_ACCOUNTS}=await import('../server/social.js');const children=[];
+ const window={isDestroyed:()=>false,getContentSize:()=>[1480,1000],webContents:{send:()=>{},getZoomFactor:()=>1},contentView:{addChildView:v=>children.push(v),removeChildView:v=>children.splice(children.indexOf(v),1)}};
+ const surface=createSocialSurface({window,View,accounts:()=>CREATOR_ACCOUNTS,protect:()=>{}});
+ for(const account of CREATOR_ACCOUNTS){surface.mount(account.id);assert.equal(children.length,1);assert.equal(surface.snapshot().panels[0].target,'create');assert.equal(children[0].options.webPreferences.partition,'persist:social-'+account.id);assert.equal(children[0].options.webPreferences.preload,undefined);}
+ const content=children[0].webContents;surface.close();assert.equal(children.length,0);assert.equal(content.destroyed,true);
+});

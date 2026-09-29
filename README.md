@@ -1,182 +1,267 @@
-## Version 2.6 : accès Discord, réseau et publication
+<div align="center">
 
-L’accès au dashboard est réservé au compte Discord propriétaire `904012939206471710`. Dans l’application Discord Developer `1536996866993037364`, enregistrer la redirection `http://127.0.0.1:4317/auth/discord/callback`. Au premier lancement sur chaque PC, saisir le Client Secret dans l’écran local de configuration (jamais dans Git ou les notes de release). Le navigateur par défaut assure la connexion OAuth ; les jetons et le secret sont chiffrés avec Windows DPAPI dans le profil utilisateur. La session est vérifiée au redémarrage et renouvelée avec Discord. Une indisponibilité réseau ou une révocation peut imposer une nouvelle connexion. Ce contrôle ne prétend pas résister à un administrateur local qui modifierait le code de cette application open source.
-
-Dans Mes projets, **Push GitHub** envoie le commit existant d’un dépôt propre. **Publier une release** prépare les fichiers de `release/` correspondant à la version du `package.json`, affiche leur liste, crée/reprend un brouillon, affiche les octets et pourcentages transmis, vérifie les empreintes SHA-256 distantes puis publie. Configurer Git Credential Manager pour GitHub, créer un commit et utiliser Push GitHub avant la release. Les releases déjà publiques et les tags désignant un autre commit ne sont pas écrasés.
-
-Le bouton **Scanner mon réseau** recherche à la demande les appareils répondant au protocole RDP sur 3389 : sous-réseaux IPv4 privés directement connectés, limités à la tranche /24 locale pour un grand réseau et à quatre interfaces. Les résultats proposent un bouton de connexion et un champ de compte distant. Le scan n’active pas RDP sur les appareils ; un port RDP ouvert ne signifie pas que le compte est autorisé. Les VPS, les réseaux IPv6 et les ports personnalisés restent configurables manuellement.
-
-L’installateur affiche les étapes de détection et d’installation, le nom du logiciel, les sorties WinGet et la durée de chaque installation. Les installateurs tiers ne fournissant pas tous un pourcentage, aucun pourcentage d’installation fictif n’est affiché.
-
-## Télécharger
-
-L’installateur Windows est disponible dans les [releases GitHub](https://github.com/LeStitcheur/lestitcheur-dashboard/releases). Télécharger le fichier `LeStitcheur-Control-Setup-2.5.1.exe`, puis suivre l’assistant. Les fichiers `.blockmap` et `latest.yml` servent aux mises à jour et ne sont pas nécessaires à une installation manuelle.
-
-## Installateur 2.5.1 : outils automatiques
-
-Le Setup Windows vérifie Node.js/npm, Git, PowerShell 7, VS Code, Laragon et Spotify. Il installe les outils absents via WinGet, sans mettre à niveau ceux déjà détectés. FiveM est exclu. Si WinGet manque, le module officiel Microsoft.WinGet.Client tente de le préparer. Internet et les éventuelles autorisations UAC sont nécessaires. Les conditions de licence de chaque éditeur restent applicables. Laragon peut nécessiter une activation ; ses bases existantes ne sont pas modifiées par ce contrôle.
-
-En cas d’échec, le Setup propose de réessayer, en conservant les installations réussies. Les journaux et le résultat détaillé sont dans `%LOCALAPPDATA%\LeStitcheur Control\installer`. Le mode silencieux renvoie un code non nul en cas d’échec. Le contrôle sans installation se lance avec `powershell.exe -NoProfile -File desktop/prerequisites.ps1 -CheckOnly` depuis les sources. Les comptes et les connexions restent à configurer dans le dashboard. Après une installation neuve de Laragon, démarrer MySQL une première fois depuis Laragon pour initialiser sa base.
-
-# Version 2.5 — installation Windows et RDP intégré
-
-Périmètre actuel : **Windows 10/11 64 bits uniquement**. Les builds macOS et Linux sont reportés.
-
-## Installer sur un autre PC
-
-Copier uniquement release/LeStitcheur-Control-Setup-2.5.1.exe sur le PC, le lancer, choisir le dossier et terminer l’assistant. L’exécutable contient Electron, le backend et le composant RDP ; Node.js et Codex ne sont pas nécessaires pour lancer le dashboard. Un raccourci bureau est créé.
-
-Au premier lancement, choisir le dossier des projets. Aucun compte social, clé ni configuration de cette machine de développement n’est embarqué. Les données de chaque utilisateur restent dans son profil Windows et sont conservées lors des mises à jour. Le dossier initial de projets existe automatiquement.
-
-Fonctions optionnelles : Node.js/npm pour les scripts de projets Node ; Git pour les dépôts ; VS Code pour le bouton éditeur ; Laragon/FiveM/Spotify pour leurs intégrations. Le terminal utilise PowerShell 7 lorsqu’il le trouve et sinon Windows PowerShell, fourni avec Windows. Le programme ne dépend pas du runtime Codex.
-
-## Bureau distant
-
-Dans **Bureau distant**, enregistrer un profil : nom, adresse IP/DNS, port (3389 par défaut), compte et domaine facultatif. Sélectionner le profil, saisir le mot de passe et ouvrir le bureau. Le rendu et les entrées sont gérés par le contrôle RDP natif Microsoft, hébergé comme fenêtre enfant du dashboard. Aucune passerelle Guacamole n’est requise.
-
-Le mot de passe n’est jamais enregistré dans le profil, écrit sur disque ou placé dans une ligne de commande. Il transite par le canal stdin privé vers le composant natif. Les contrôles CredSSP et de certificat Windows sont conservés. Presse-papiers désactivé par défaut et activable par profil ; disques, imprimantes et ports ne sont pas redirigés.
-
-La cible doit avoir RDP activé et être joignable (réseau local ou VPN). Quitter l’espace déconnecte le client sans arrêter les applications distantes. Le programme n’active pas RDP et ne modifie pas le pare-feu de la cible.
-
-Le composant est compilé avant chaque build avec le compilateur .NET Framework Windows puis inclus dans resources/rdp-host.exe. Les tests couvrent les profils, l’absence de persistance du mot de passe et l’initialisation du contrôle intégré. Une authentification réelle sur ton PC/VPS reste à vérifier avec ses identifiants.
-
-Références Microsoft : [contrôle RDP](https://learn.microsoft.com/en-us/windows/win32/termserv/msrdpclient9notsafeforscripting), [authentification du serveur](https://learn.microsoft.com/en-us/windows/win32/termserv/imsrdpclientadvancedsettings4-authenticationlevel).
-
-# Version 2.4 — espace personnel
-
-- **Mon espace** : sessions configurables (services, éditeur, musique, terminal), notifications persistantes avec lecture globale et mode silencieux, surveillance toutes les 60 secondes pendant que l’application fonctionne, calendrier éditorial et relevés manuels, organisation des widgets et favoris, commandes enregistrées, sauvegardes et mises à jour.
-- **Terminaux** : jusqu’à six sessions pwsh indépendantes, noms éditables, deux panneaux côte à côte, commandes enregistrées insérées sans exécution. Les boutons dev/start des fiches projets exécutent le script npm choisi dans un terminal. Les processus et journaux de terminal ne sont pas restaurés après fermeture de l’application.
-- **Projets** : état Git, dernier commit, fichiers modifiés (100 maximum), lien homepage du package.json, dev/start et journaux du projet.
-- **DNS** : consultation des 30 sauvegardes précédentes par domaine. La restauration se prépare groupe par groupe et utilise l’aperçu et la confirmation existants ; elle ne remplace pas silencieusement toute la zone.
-- **Discord** : les actions effectuées via les bots sont enregistrées avec leur motif dans le journal persistant (500 dernières notifications toutes sources confondues).
-- **Sauvegarde** : AES-256-GCM avec dérivation scrypt et mot de passe de 12 caractères minimum. Contient les paramètres et les secrets déjà protégés par DPAPI, restaurables sous le même compte Windows. N’inclut pas les cookies ni les projets. Copie précédente dans settings.json.bak.
-- **Mises à jour** : source HTTPS configurable dans Mon espace. Aucune source publique n’est préconfigurée. Publier release/latest.yml, l’installateur et le .blockmap ensemble. Recherche manuelle ou chaque heure, téléchargement et installation explicites, contrôle des tâches et sauvegarde préalable. Mécanisme electron-updater 6 / NSIS : https://www.electron.build/auto-update/ . Aucun fichier n’est publié par le build.
-- **Limites des plateformes sociales** : pas de collecte de mots de passe ou de jetons personnels. Les notifications et statistiques personnelles restent dans les interfaces officielles intégrées. Les statistiques saisies dans le studio sont explicitement manuelles ; aucune publication automatique vers les réseaux.
-- **Surveillance** : lectures des services locaux, de Pterodactyl, des derniers déploiements Vercel et sondes HEAD des sites configurés. Une transition d’état crée une notification ; un arrêt volontaire peut donc apparaître dans l’historique. Les sondes ne déclenchent aucun redémarrage ni déploiement.
-
-# Terminal intégré et confort (2.3)
-
-Le terminal standard est un vrai PowerShell 7, affiché via xterm.js et ConPTY. Profil, modules, historique PSReadLine, Tab, programmes interactifs et Ctrl+C sont disponibles. Copier/coller : Ctrl+Maj+C / Ctrl+Maj+V et boutons dédiés. La session reste active lors des changements de page. Fermer ou remplacer une session active demande confirmation ; le terminal administrateur reste une fenêtre Windows séparée. Les boutons Terminal des projets utilisent le terminal intégré dans l’application de bureau.
-
-Le profil normal est toujours `%APPDATA%\LeStitcheur Control`, en développement comme après installation. Les réglages restent hors de l’exécutable, sont sauvegardés dans settings.json.bak, et une copie settings.json.pre-update est créée par le script d’installation. Une copie valide peut restaurer un fichier endommagé. Les tests utilisent exclusivement LESTITCHEUR_PROFILE_DIR pour isoler leur profil. Les profils de développement historiques restent sur disque ; ils n’écrasent pas les paramètres installés.
-
-Le compte TikTok corrigé est @ledistributeurdesourire ; son identifiant interne est conservé pour garder sa session. Les panneaux sociaux s’empilent sur les écrans courants et disposent d’un zoom automatique ou manuel. L’emblème vectoriel LSF est dans public/emblem.svg ; scripts/create-icon.mjs produit les icônes Windows à chaque build.
+<img src="public/emblem.svg" width="90" alt="Emblème LeStitcheur Control" />
 
 # LeStitcheur Control
 
-Application Windows personnelle, en français, inspirée de la bannière LeStitcheurFou. Electron contient l’interface React et le serveur local Express. Les données affichées viennent du PC et des comptes connectés : aucun serveur, projet ou titre Spotify fictif.
+**Tes serveurs, tes projets et tes communautés. Un seul endroit pour tout retrouver.**
 
-## Lancer
+![Version](https://img.shields.io/badge/version-2.9.0-ff405c?style=flat-square)
+![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-171b24?style=flat-square&logo=windows)
+![Electron](https://img.shields.io/badge/Electron-171b24?style=flat-square&logo=electron)
+![React](https://img.shields.io/badge/React-171b24?style=flat-square&logo=react)
 
-Double-cliquer sur le raccourci **LeStitcheur Control** sur le Bureau. L’application ouvre sa propre fenêtre, sans terminal ni navigateur à lancer. Son moteur est inclus dans l’installation. Les polices et la bannière sont incluses localement.
+[Fonctionnalités](#fonctionnalites) · [Installation](#installation) · [Configuration](#configuration) · [Développement](#developpement)
 
-Fermer la fenêtre masque l’application près de l’horloge pour garder les services et opérations actifs. Son icône ou le raccourci rouvre la même session. Pour quitter complètement : clic droit sur l’icône → **Quitter**, ou **Ctrl+Q**. Si des opérations sont en cours ou que MySQL/FiveM sont gérés par l’application, les terminer ou arrêter ces services depuis Laragon/txAdmin avant de quitter.
+<img src="public/banner.png" width="100%" alt="Bannière LeStitcheurFou, univers rouge et noir" />
 
-Installation : `%LOCALAPPDATA%\Programs\LeStitcheur Control`. La compilation crée un installateur `release/LeStitcheur-Control-Setup-<version>.exe`, selon la version de `package.json`. Il installe pour le compte Windows courant et crée les raccourcis Bureau et menu Démarrer. Désinstallation depuis les applications Windows ; les réglages sont conservés.
+</div>
 
-Pour reconstruire et installer depuis les sources (Node.js 22.12+ requis pour cette étape) :
+---
+
+## ✨ Pourquoi ce dashboard ?
+
+Lancer MySQL, retrouver un projet, ouvrir la console d’un serveur, vérifier un déploiement, changer de musique… Ces petites actions finissent vite par remplir le bureau de fenêtres.
+
+LeStitcheur Control les rassemble dans une application Windows, en français, pensée pour les sessions de développement et la gestion de communautés. Tu ouvres le raccourci, tu retrouves ton espace et tu reprends là où tu en étais : tes paramètres et les connexions prises en charge restent dans ton profil Windows.
+
+> **Un projet personnel, pour le moment.** Cette version réserve l’accès au compte Discord du propriétaire. Installer l’application sur un autre PC ne donne pas accès avec un autre compte Discord. Windows 10/11 **64 bits** est la seule plateforme prise en charge actuellement.
+
+<a id="fonctionnalites"></a>
+
+## 🚀 Ce que tu peux faire
+
+### 🖥️ Retrouver ton espace de travail
+
+La vue d’ensemble réunit l’état du PC, les serveurs et les raccourcis utiles. Tu peux organiser les widgets, garder tes projets favoris à portée de main et préparer des sessions qui ouvrent tes outils dans l’ordre voulu.
+
+**Mon espace** regroupe les notifications, la surveillance CPU/RAM/disque, les alertes de service et le suivi des domaines. Le récap **Codex** affiche l’usage du compte et les projets récemment utilisés lorsque Codex est installé et connecté sur le PC. La surveillance fonctionne pendant que le dashboard tourne.
+
+### 🎮 Piloter tes serveurs
+
+- **Pterodactyl** : retrouver les serveurs du VPS, consulter leur état et leurs ressources, les démarrer, les arrêter ou les redémarrer. Chaque serveur dispose de sa console intégrée, avec les logs en direct et l’envoi de commandes.
+- **MySQL + FiveM** : démarrer MySQL, attendre qu’il réponde, puis lancer le serveur FiveM local. Le mode Laragon reprend la configuration et les bases existantes.
+- **Bases MySQL** : consulter les bases, leur taille et les connexions, exporter un fichier SQL ou importer une sauvegarde. Un import demande confirmation et crée une sauvegarde préalable ; sa taille est limitée à 20 Mo.
+
+### 📂 Travailler sur tes projets et ton GitHub
+
+Le dashboard liste les dossiers de ton répertoire de développement. Pour chaque projet, tu peux ouvrir VS Code ou un terminal à sa racine, le renommer, l’envoyer à la Corbeille, lancer ses scripts et consulter les journaux.
+
+La section **GitHub** permet de parcourir les dépôts, issues, pull requests, workflows et releases. Pour les dépôts locaux, tu retrouves aussi les différences Git, les commits, les branches et le pull en avance rapide.
+
+Les boutons **Push GitHub** et **Publier une release** sont accessibles depuis les projets configurés. La publication d’une release passe par une vérification du dépôt, des tests, du build et des fichiers à transmettre. Les actions de publication restent explicites : construire l’application ne publie rien sur GitHub.
+
+### ⌨️ Utiliser un vrai terminal
+
+Le terminal standard est intégré à l’application : PowerShell 7 lorsqu’il est disponible, sinon Windows PowerShell. Historique, autocomplétion, programmes interactifs, copier/coller et `Ctrl+C` restent disponibles.
+
+Tu peux garder jusqu’à six sessions et afficher deux terminaux côte à côte. Elles restent actives quand tu changes de page. Le terminal administrateur s’ouvre dans une fenêtre Windows séparée, avec la confirmation UAC habituelle.
+
+### 🌐 Accéder à tes PC à distance
+
+La section **Bureau distant** intègre le client RDP Windows. Lance un scan du réseau local pour retrouver les appareils qui répondent sur le port RDP standard, ou ajoute directement l’adresse d’un PC ou d’un VPS.
+
+L’aperçu peut passer en plein écran, avec un bouton flottant pour en sortir. Les profils sont enregistrés ; les mots de passe RDP ne le sont pas. Le PC distant doit déjà autoriser RDP et être joignable : le scan n’active pas cette fonction à sa place.
+
+### 💬 Garder le contact avec tes communautés
+
+**Mes réseaux** permet d’ajouter tes comptes Instagram, TikTok, Facebook, YouTube et X. Chaque compte possède son espace et sa session. Tu peux consulter les interfaces officielles, retrouver les notifications et statistiques disponibles, puis ouvrir **Publier** pour choisir une image ou une vidéo dans le service concerné.
+
+Les possibilités dépendent du réseau : TikTok Studio Web privilégie la vidéo, les publications photo peuvent nécessiter l’application mobile, et certaines statistiques demandent un compte créateur ou professionnel. Le dashboard ne regroupe pas les compteurs sociaux dans une statistique globale. Un bouton **Navigateur** prend le relais si un site refuse la connexion intégrée.
+
+Dans **Discord**, le client officiel donne accès aux DM et aux serveurs de ton compte. Un espace séparé pour tes bots permet de consulter membres, bannissements et statistiques, puis d’effectuer les actions de modération autorisées : rôles, pseudos, exclusions, bannissements et contrôles vocaux. Les permissions Discord et la hiérarchie des rôles continuent de s’appliquer.
+
+### 🎨 Créer et écouter
+
+- **ChatGPT Images** : préparer un brouillon, le copier et créer dans l’espace officiel ChatGPT, avec les possibilités de ton compte.
+- **Studio Suno** : préparer un style ou des paroles, puis créer la musique dans Suno.
+- **Spotify** : retrouver le morceau en cours et piloter la lecture depuis l’application Spotify installée sur le PC, sans clé API dans ce mode.
+
+Les créations sont validées dans ChatGPT ou Suno. Leurs limites et abonnements restent ceux de ces services ; un abonnement ChatGPT ne fournit pas de crédits API au dashboard.
+
+### ☁️ Gérer tes domaines et déploiements
+
+**Hostinger** rassemble les domaines, leurs échéances et les zones DNS. Avant une modification, le dashboard présente les changements et demande confirmation. Il conserve également un historique des sauvegardes DNS effectuées depuis l’application.
+
+**Vercel** affiche les projets, déploiements et journaux de build. Tu peux ouvrir un site ou relancer un déploiement existant après confirmation. Ce redéploiement ne transmet pas les fichiers de ton dossier local.
+
+---
+
+<a id="installation"></a>
+
+## 📦 Installer l’application
+
+### 1. Récupérer l’installateur
+
+Utilise le fichier **`LeStitcheur-Control-Setup-<version>.exe`** fourni avec la version souhaitée. Les versions publiées sont à retrouver dans les [Releases GitHub](https://github.com/LeStitcheur/lestitcheur-dashboard/releases).
+
+Si aucune release n’est encore disponible, tu peux construire l’installateur depuis les sources en suivant la section [Développement](#developpement). Le build le dépose dans `release/`. Les fichiers `latest.yml` et `.blockmap` servent aux mises à jour ; tu n’en as pas besoin pour une installation manuelle.
+
+### 2. Suivre l’assistant Windows
+
+Lance le `.exe`, choisis le dossier d’installation et laisse l’assistant terminer. Il vérifie la présence de **Node.js/npm, Git, PowerShell 7, VS Code, Laragon et Spotify**, puis tente d’installer les outils manquants avec WinGet. Les outils déjà détectés sont conservés.
+
+Prévois une connexion Internet et accepte les demandes Windows nécessaires à ces installations. **FiveM n’est pas installé automatiquement** : tu renseigneras ton installation existante dans les paramètres. Après une installation neuve de Laragon, démarre MySQL une première fois depuis Laragon pour initialiser sa base.
+
+L’assistant affiche les étapes, les logiciels concernés et leur progression disponible. En cas d’échec, il propose de réessayer ; les journaux se trouvent dans `%LOCALAPPDATA%\LeStitcheur Control\installer`.
+
+### 3. Ouvrir le dashboard et se connecter
+
+Un raccourci **LeStitcheur Control** est créé sur le Bureau et dans le menu Démarrer. L’application contient son moteur : aucun terminal, navigateur ou Codex n’est nécessaire pour la lancer.
+
+Au premier démarrage sur le PC :
+
+1. Configure l’accès Discord avec le **Client Secret de l’application du propriétaire**, uniquement dans l’écran prévu à cet effet.
+2. Clique sur **Se connecter avec Discord**. L’autorisation s’ouvre dans ton navigateur par défaut.
+3. Connecte-toi avec le compte propriétaire, puis reviens au dashboard.
+4. Choisis ton dossier de projets et configure les services que tu souhaites utiliser.
+
+La session Discord est conservée entre les redémarrages et renouvelée quand c’est possible. Une révocation ou un problème de connexion peut demander une nouvelle authentification. **Se déconnecter** verrouille le dashboard et ferme ses vues sociales et RDP, sans arrêter les services locaux ni les commandes en cours.
+
+<details>
+<summary><strong>Configuration Discord pour le propriétaire du projet</strong></summary>
+
+Dans le [Discord Developer Portal](https://discord.com/developers/applications), l’application actuellement utilisée est `1536996866993037364`. Ajoute cette redirection OAuth2 pour la version installée :
+
+```text
+http://127.0.0.1:4317/auth/discord/callback
+```
+
+Le compte autorisé est `904012939206471710`. Ces identifiants sont publics ; le **Client Secret**, lui, doit rester privé et être saisi uniquement dans l’application. Aucun secret n’est fourni dans l’installateur.
+
+Pour adapter une copie du projet à un autre propriétaire, les identifiants sont définis dans `server/access.js`. Il faut utiliser sa propre application Discord, configurer sa redirection et reconstruire l’exécutable.
+
+</details>
+
+### 4. Mettre à jour sans tout reconfigurer
+
+Installe la nouvelle version avec son assistant. Termine d’abord les opérations importantes et ferme proprement l’application. Tes réglages restent dans ton profil Windows, indépendamment du dossier d’installation.
+
+La recherche de mises à jour peut aussi être configurée dans **Mon espace** avec une source HTTPS. Aucune source publique n’est préconfigurée.
+
+<a id="configuration"></a>
+
+## 🔌 Connecter tes services
+
+Tu peux configurer les intégrations progressivement ; chacune possède son propre accès.
+
+- **Pterodactyl** — Dans Paramètres, renseigne l’adresse **HTTP ou HTTPS** du panel et une clé **API Client**. Wings doit être joignable depuis le PC pour utiliser les consoles.
+- **Laragon et FiveM** — Indique le dossier Laragon, puis l’exécutable, le dossier de travail et les arguments de ton serveur FiveM. Si plusieurs versions MySQL sont présentes, sélectionne celle à utiliser.
+- **GitHub** — Configure l’authentification Git avec Git Credential Manager et le remote `origin` du dépôt. Pour pousser, prépare un commit et un dépôt propre ; le dashboard affiche la destination avant confirmation.
+- **Réseaux sociaux** — Ouvre Mes réseaux → Ajouter un compte, choisis la plateforme et renseigne le pseudo. Connecte-toi ensuite au bon compte dans son espace officiel.
+- **Bots Discord** — Ajoute le jeton du bot dans la section Discord. Pour lister les membres, active **Server Members Intent** dans son portail développeur. Le bot doit être présent sur le serveur et disposer des permissions nécessaires.
+- **Hostinger et Vercel** — Ajoute respectivement une clé API Hostinger et un jeton Vercel dans leurs sections. Le Team ID Vercel est facultatif.
+- **Spotify** — Ouvre l’application Spotify sur Windows et lance un morceau. Le mode de connexion par défaut utilise sa session média ; les commandes disponibles dépendent de ce qu’elle expose.
+
+<details>
+<summary><strong>Utiliser Spotify Connect à la place de l’application Windows</strong></summary>
+
+Dans Paramètres → Spotify, sélectionne le mode API. Crée une application dans le [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), puis enregistre cette redirection exacte :
+
+```text
+http://127.0.0.1:4317/auth/spotify/callback
+```
+
+Renseigne le Client ID, enregistre les paramètres et connecte le compte. Aucun Client Secret Spotify n’est demandé. Ce mode nécessite un appareil Spotify actif et les droits requis par Spotify, notamment Premium pour les commandes de lecture.
+
+</details>
+
+## 💾 Tes données restent sur ton PC
+
+Les paramètres sont enregistrés dans **`%APPDATA%\LeStitcheur Control`**, en dehors de l’installation. Les secrets pris en charge sont chiffrés par Windows pour le compte utilisateur courant. Copier ces fichiers vers un autre compte Windows ne rend pas les secrets utilisables.
+
+Les espaces sociaux gardent leurs sessions séparément. Si tu passes par le navigateur habituel, tu utilises sa propre session : les cookies ne sont pas transférés depuis le dashboard.
+
+**Mon espace** propose une sauvegarde chiffrée des paramètres. Elle n’inclut ni les dossiers de projets ni les cookies des services ; les secrets protégés par Windows restent liés au même compte Windows. Les exports SQL se trouvent dans `mysql-backups` et les sauvegardes DNS dans `dns-backups`, à l’intérieur du profil de l’application.
+
+Fermer la fenêtre laisse le dashboard dans la zone de notification pour conserver la session en cours. Pour le quitter complètement, utilise son icône près de l’horloge → **Quitter**, ou `Ctrl+Q`. Les terminaux ne sont pas restaurés après un arrêt complet.
+
+---
+
+<a id="developpement"></a>
+
+## 🛠️ Lancer le projet depuis les sources
+
+Pour développer ou construire l’installateur, prévois **Windows x64**, **Git** et **Node.js 22.12 ou plus récent** avec npm. La compilation du composant RDP utilise le compilateur .NET Framework Windows.
 
 ```powershell
+git clone https://github.com/LeStitcheur/lestitcheur-dashboard.git
+cd lestitcheur-dashboard
 npm ci
+```
+
+### Construire l’application Windows
+
+```powershell
 npm run desktop:build
+```
+
+L’installateur est créé dans `release/LeStitcheur-Control-Setup-<version>.exe`. Tu peux ensuite l’ouvrir, ou utiliser le script d’installation :
+
+```powershell
 npm run desktop:install
 ```
 
-Le script d’installation importe `.local/settings.json` si aucun réglage n’existe encore dans le profil Windows. Les données privées ne sont jamais incluses dans l’installateur. L’application installée ne dépend plus du dossier des sources. Node.js/npm restent nécessaires pour analyser et construire les autres projets ; Git reste nécessaire pour les opérations Git.
+Ce script installe l’application, crée le raccourci et la relance. Il sauvegarde au préalable les paramètres existants. Le build ne publie aucun fichier sur GitHub.
 
-## Version navigateur et développement
+### Prévisualiser et tester
 
-L’ancien **Lancer LeStitcheur.cmd** reste disponible pour ouvrir la version navigateur sur **http://127.0.0.1:4317**. Ne pas l’exécuter en même temps que l’application Windows : elles utilisent le même port, notamment pour le retour Spotify.
-
-Le serveur tourne en arrière-plan ; fermer l’onglet ne l’arrête pas. **Arreter LeStitcheur.cmd** ferme uniquement le processus du panel, après vérification de son identité. Les services se gèrent séparément depuis txAdmin ou Windows. Son PID et ses journaux sont dans `.local/`. En développement :
+Après un build, ouvre la fenêtre Electron depuis les sources avec :
 
 ```powershell
-npm install
+npm run desktop
+```
+
+Elle utilise le port **4318**, contre **4317** pour l’application installée. Par défaut, les deux utilisent le même profil Windows. Pour isoler une session de développement, définis `LESTITCHEUR_PROFILE_DIR` avant le lancement :
+
+```powershell
+$env:LESTITCHEUR_PROFILE_DIR = Join-Path $PWD '.local\desktop-dev'
+npm run desktop
+```
+
+Pour cette session, ajoute aussi `http://127.0.0.1:4318/auth/discord/callback` aux redirections de l’application Discord.
+
+Pour travailler sur l’interface dans un navigateur :
+
+```powershell
 npm run dev
 ```
 
-Le mode développement sert la même API locale sur le port 4317. Le rechargement automatique est désactivé : actualiser après une modification. Pour une version compilée : `npm run build`, puis `npm start`. Ne pas lancer les deux sur le même port.
+Ce mode utilise `http://127.0.0.1:4317` et les paramètres de `.local/`. Libère ce port avant de le lancer. Le RDP, les terminaux natifs et les espaces sociaux intégrés nécessitent la fenêtre Electron.
 
-Pour tester la fenêtre Windows depuis les sources : `npm run build`, puis `npm run desktop`. Cette prévisualisation utilise le port **4318** et un profil séparé dans `.local/desktop-dev`, afin de laisser l’application installée disponible. Les connexions et réglages de ce profil ne sont pas transférés automatiquement à l’application installée.
-
-## Ce qui est disponible
-
-- Vue d’ensemble : CPU, RAM, état local, serveurs Pterodactyl, projets et journal de session.
-- **Pterodactyl** : liste des serveurs, état, CPU/RAM/disque, démarrage, arrêt, redémarrage et console intégrée par serveur (logs en direct, couleurs ANSI, commandes, historique ↑/↓, reconnexion et effacement de l’affichage). Configurer l’URL HTTP ou HTTPS (avec le port si nécessaire) et une **clé API Client** dans Paramètres. Les permissions de cette clé s’appliquent. Le bouton **Console** est accessible dans Mes serveurs et dans l’onglet VPS de la vue d’ensemble. La connexion à Wings est ouverte uniquement pendant l’affichage de la console, avec renouvellement du jeton et reconnexion automatique. Wings doit être joignable depuis ce PC ; le compte doit disposer de `websocket.connect` et de `control.console` pour envoyer des commandes. Les clés et jetons restent côté serveur local. Les logs restent en mémoire (5 000 lignes max.) ; effacer l’affichage ne supprime pas les logs du serveur. Une commande n’est jamais réenvoyée automatiquement après une coupure.
-- **MySQL → FiveM** : lancement MySQL puis attente d’un handshake MySQL avant FiveM. Le mode **Laragon** détecte `mysqld.exe` dans `C:\laragon\bin\mysql`, lit le `my.ini` de la version installée et reprend son port et son dossier de données. Sur ce PC : MySQL 8.4.3, base `C:\laragon\data\mysql-8.4`, port 3306. Aucune initialisation, copie ou suppression des bases. Une instance accessible est réutilisée. Si plusieurs versions sont installées, préciser le nom du dossier de la version dans les paramètres. Les modes exécutable manuel et service Windows (UAC) restent disponibles. Le profil txAdmin dans `C:\Users\lelex\Desktop\test serv` est préconfiguré.
-- **Terminaux** : PowerShell normal ou administrateur (UAC), à la racine de dev ; terminal par projet. VS Code doit être installé dans son emplacement Windows standard.
-- **Projets** : sous-dossiers directs de `C:\Users\lelex\Desktop\dev`, recherche, filtre Git/Node, ouverture VS Code, terminal, renommage et suppression vers la Corbeille après saisie du nom. Les jonctions sont exclues, le dossier de l’application en cours est protégé.
-- **Analyse** : exécution des scripts `lint` et `test` disponibles dans les projets Node. Les dépendances doivent déjà être installées. Les projets sans scripts compatibles produisent un diagnostic, pas une réussite simulée.
-- **Test de déploiement** : exécution locale de `npm run build`. Cela vérifie la construction, pas le fonctionnement d’un hébergement ou sa configuration. Les scripts du projet (y compris pre/post) s’exécutent réellement : les vérifier avant de lancer un projet tiers.
-- **Publication GitHub** : envoi du commit existant sur la branche courante via l’unique remote `origin` GitHub. Nécessite un dépôt propre, un commit et une authentification Git déjà configurée. Le dépôt, la branche et le commit sont affichés avant confirmation, puis revérifiés. Aucun `git add`, commit automatique ou force push. Les workflows GitHub du dépôt peuvent démarrer après le push. Les hooks locaux pre-push sont désactivés pour cette action.
-- **Spotify Windows** : mode par défaut, sans clé API. Lecture du morceau, de l’artiste, de la progression et des commandes disponibles auprès de la session Spotify Windows. Lecture/pause, précédent/suivant, aléatoire et répétition selon les capacités annoncées par Spotify. Le volume se règle dans Spotify. Le bouton Ouvrir retrouve l’exécutable ou le protocole `spotify:`.
-- **Mes réseaux** : espaces séparés pour TikTok `@lestitcheurfou`, `@lesdistributeurdesourires`, Instagram `@lestitcheur` et `@laholyfolle`. Accès au profil, fil, messages, activité et statistiques dans les interfaces officielles, avec une session persistante par compte. Connexion manuelle la première fois ; les notifications et compteurs restent dans ces interfaces, sans agrégation automatique ni statistiques simulées. Sur TikTok, les notifications s’ouvrent avec la cloche du fil. Les statistiques Instagram dépendent du type de compte. Si le réseau refuse la fenêtre Electron, son menu Navigation permet de l’ouvrir dans le navigateur habituel (session du navigateur). La version navigateur du dashboard propose les liens publics ; les espaces isolés nécessitent l’application Windows.
-- **Hostinger / DNS** : liste des domaines et échéances, ouverture d’une zone par son nom, recherche et édition des groupes DNS A, AAAA, CNAME, TXT, MX, SRV, CAA et NS. L’aperçu avant/après et la saisie du domaine précèdent l’envoi. Une nouvelle vérification refuse une zone modifiée entre-temps ; une sauvegarde est écrite dans `%APPDATA%\LeStitcheur Control\dns-backups`. Les autres groupes sont conservés. Les groupes comportant des valeurs désactivées doivent être modifiés dans hPanel. Les modifications se propagent selon les délais DNS.
-- **Vercel** : projets, 40 derniers déploiements du compte ou de l’équipe sélectionnée, état, branche, message de commit, journaux du build et ouverture du site. Le redéploiement reprend le déploiement sélectionné et sa cible, avec confirmation du nom du projet. Une cible production est signalée explicitement. Il ne pousse pas les fichiers locaux.
-
-## Connecter les services
-
-### Vue directe des réseaux (sources 2.1)
-
-La page **Mes réseaux** propose un sélecteur de compte et les vues **Notifications**, **Statistiques** ou **Les deux**. Les pages officielles s’affichent directement dans la fenêtre principale grâce à deux panneaux natifs isolés, sans accès Node ni au pont local du dashboard. Les sessions réutilisent celles des espaces v2, séparées par compte. Le changement de compte ferme les pages précédentes ; les panneaux sont masqués lors d’un dialogue local et fermés en quittant la section.
-
-Se connecter au bon compte lors de la première utilisation. TikTok nécessite d’ouvrir sa cloche dans le panneau d’activité ; les statistiques sont dans TikTok Studio. Les statistiques détaillées Instagram dépendent du type de compte. Il n’y a pas de compteur agrégé ni de lecture des cookies ou jetons de session par le dashboard. La version navigateur ne peut pas intégrer ces pages : ouvrir l’application Windows. Si le site refuse de charger, utiliser son espace séparé ou le navigateur.
-
-### Discord (sources 2.1)
-
-- **DM & mes serveurs** affiche le client Discord officiel dans un panneau natif, avec une session personnelle persistante. Les derniers DM et la liste des serveurs sont ceux du client. Pour quitter un serveur : clic droit sur son icône → Quitter le serveur, puis confirmation dans Discord. Le dashboard n’utilise aucun jeton de compte personnel et n’extrait pas les messages privés.
-- **Serveurs de mes bots** accepte jusqu’à 10 jetons de bots. La connexion est vérifiée avec l’API Discord et refuse un compte qui n’est pas un bot. Les jetons sont chiffrés avec Windows DPAPI, jamais renvoyés à l’interface, et conservés avec les réglages existants. Déconnecter un bot supprime seulement sa connexion locale ; cela ne le fait pas quitter ses serveurs.
-- Pour chaque bot : liste paginée des serveurs où il est présent, liste des membres et des bannis par pages de 200, recherche parmi les lignes chargées, export JSON des lignes chargées. L’export indique s’il est complet ; charger toutes les pages avant d’exporter une liste complète.
-- Statistiques : estimations Discord du nombre de membres et des présences, salons retournés par l’API, nombre de rôles, boosts et niveau de boost, avec date du relevé. Pas d’historique inventé de messages, d’activité ou de croissance.
-- Actions individuelles : expulsion, bannissement sans suppression de messages, débannissement, exclusion temporaire jusqu’à 28 jours, retrait de cette exclusion, pseudo, ajout/retrait d’un rôle, micro/écoute en vocal et déconnexion du vocal. Le formulaire exige une raison d’audit, puis une confirmation par l’identifiant du membre. Une autorisation temporaire à usage unique est créée ; permissions, hiérarchie des rôles et cible sont revérifiées avant l’action. Aucun envoi automatique après une réponse réseau incertaine.
-
-Pour lister les membres, activer **Server Members Intent** dans le portail développeur du bot. Le bot doit être invité sur les serveurs concernés, posséder les permissions des actions choisies, et son rôle doit être au-dessus de ceux de la cible. Propriétaire du serveur et bot utilisé ne peuvent pas être ciblés depuis le dashboard. Les administrateurs ne peuvent pas recevoir d’exclusion temporaire. Les contrôles vocaux nécessitent un membre présent en vocal. Discord reste l’autorité finale pour les permissions et peut refuser une opération.
-
-Références : [API des serveurs Discord](https://docs.discord.com/developers/resources/guild), [liste des serveurs et compte courant](https://docs.discord.com/developers/resources/user), [portail des applications Discord](https://discord.com/developers/applications).
-
-### Spotify, Hostinger et Vercel
-
-**Spotify Windows** : ouvrir Spotify, lancer un morceau puis revenir au dashboard. Aucun Client ID n’est nécessaire. Les commandes agissent uniquement sur la session identifiée comme Spotify. L’accès a été vérifié avec l’application installée sur ce PC.
-
-**Hostinger** : dans Domaines & DNS, saisir une clé créée dans [hPanel → API](https://hpanel.hostinger.com/profile/api), puis enregistrer. **Vercel** : dans sa page, saisir un [jeton Vercel](https://vercel.com/account/settings/tokens), et éventuellement le Team ID. Utiliser une clé ayant accès aux ressources voulues. Les clés sont chiffrées par Windows ; elles ne sont pas affichées après enregistrement. Ces intégrations nécessitent les identifiants du compte pour leur validation réelle.
-
-**Spotify Connect** reste disponible en option dans Paramètres → Spotify → Mode de connexion. Ce mode API nécessite un appareil Spotify actif, l’accès du compte à l’application API et Spotify Premium pour les commandes de lecture. Pour le configurer :
-
-1. Créer une application dans le [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
-2. Ajouter exactement `http://127.0.0.1:4317/auth/spotify/callback` dans les Redirect URIs. Ne pas utiliser `localhost`.
-3. Ajouter ton compte aux utilisateurs autorisés de l’application si nécessaire.
-4. Copier son **Client ID** dans Paramètres → Spotify, enregistrer puis cliquer sur **Connecter mon compte**. Aucun Client Secret n’est demandé.
-
-## Données et accès
-
-Les réglages de l’application Windows sont stockés dans `%APPDATA%\LeStitcheur Control\settings.json`, à l’extérieur de l’installation : une reconstruction ou mise à jour les conserve. La version navigateur garde ses réglages séparément dans `.local/settings.json`, exclu de Git avec les journaux et caches. Les clés Pterodactyl, Hostinger, Vercel et jetons Spotify sont chiffrés par Windows DPAPI pour le compte Windows courant. Ils ne sont pas renvoyés au navigateur. Les chemins et le Client ID ne sont pas des secrets et restent lisibles dans les réglages. Une copie vers un autre compte Windows ne rend pas les secrets utilisables.
-
-La fenêtre Electron est isolée : sandbox, contextIsolation et aucun accès Node depuis l’interface. Les liens externes HTTP/HTTPS, dont Spotify et txAdmin, s’ouvrent dans le navigateur habituel. Le retour OAuth Spotify ramène la fenêtre de l’application au premier plan.
-
-Le serveur écoute uniquement `127.0.0.1`. Il contrôle l’en-tête Host, l’origine et un jeton de session pour les API. Pas de CORS ouvert ni d’interface d’exécution de commandes arbitraires sur le PC. Ne pas exposer le port via un proxy public. Les administrateurs et logiciels exécutés sur le même compte Windows ont les droits de ce compte : le panel n’est pas une frontière de sécurité vis-à-vis d’eux.
-
-Les jobs et le journal d’activité sont conservés en mémoire pour la session. Les sorties des scripts peuvent contenir les données que ces scripts affichent. Au redémarrage du panel, les processus lancés auparavant ne sont plus considérés comme contrôlés par la session ; utiliser txAdmin pour les arrêter. Le bouton d’arrêt local du panel termine le processus FiveM et ses enfants ; préférer txAdmin pour un arrêt applicatif avec sauvegardes.
-
-## Structure et vérification
-
-`desktop/` : fenêtre Electron, icône, navigation et espaces sociaux ; `electron-builder.yml` : installateur ; `src/App.jsx` : interface générale ; `src/design.css` : thème v2 ; `src/CloudPages.jsx`, `src/SocialPage.jsx`, `src/MusicPlayer.jsx` : nouveaux espaces ; `server/` : API, coffre Windows, intégrations, projets et services. Les intégrations sont séparées pour ajouter de futurs modules.
+Pour vérifier le projet :
 
 ```powershell
 npm test
 npm run build
 ```
 
-Les tests créent leurs propres dossiers temporaires. Ils ne lancent pas FiveM/MySQL, ne suppriment pas de projets personnels et n’envoient rien vers GitHub. Hostinger et Vercel sont testés avec des réponses simulées : validation, confirmation, refus des modifications concurrentes, sauvegardes et absence de double envoi. Aucun DNS ou déploiement réel n’est modifié par les tests.
+### Se repérer dans les fichiers
 
-Références officielles : [API Client Pterodactyl](https://github.com/pterodactyl/panel/blob/1.0-develop/routes/api-client.php), [Spotify PKCE](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow), [Spotify Redirect URIs](https://developer.spotify.com/documentation/web-api/concepts/redirect_uri), [configuration FXServer / txAdmin](https://docs.fivem.net/docs/resources/txAdmin/).
+```text
+desktop/                Fenêtre Electron, terminaux, RDP et installateur
+server/                 API locale, paramètres et intégrations
+src/                    Interface React et styles
+public/                 Bannière, emblème et ressources visuelles
+scripts/                Compilation, installation et vérifications
+tests/                  Tests automatisés
+electron-builder.yml    Configuration du packaging Windows
+```
 
-Application Windows : [sécurité Electron](https://www.electronjs.org/docs/latest/tutorial/security), [installateurs NSIS](https://www.electron.build/nsis/), [structure Laragon](https://laragon.org/docs/directory-structure), [validation MySQL](https://dev.mysql.com/doc/refman/8.4/en/server-configuration-validation.html).
+## 🧭 Quelques repères utiles
 
-Intégrations v2 : [session média Windows](https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssession), [API Hostinger](https://docs.hostinger.com/api-reference/overview), [schémas DNS officiels](https://github.com/hostinger/api-python-sdk/blob/main/docs/DNSZoneApi.md), [API déploiements Vercel](https://vercel.com/docs/rest-api/deployments/create-a-new-deployment).
-# Récap Codex (2.2)
+- **Un compte Discord est refusé ?** L’accès est réservé au propriétaire défini dans cette version. Vérifie aussi le Client Secret et la redirection de l’application Discord.
+- **Un réseau ou un studio ne charge pas ?** Utilise le bouton Navigateur. Certains services limitent les connexions depuis un navigateur intégré.
+- **Un PC n’apparaît pas au scan ?** Le scan recherche le port 3389 sur les réseaux IPv4 privés locaux, avec un périmètre limité. Ajoute manuellement un VPS ou une cible utilisant un autre port.
+- **Un build de projet échoue ?** Installe ses dépendances et vérifie ses scripts. L’analyse exécute les scripts disponibles ; le test de déploiement vérifie la construction locale, pas l’hébergement final.
+- **Un import SQL échoue ?** La sauvegarde préalable est conservée. Un import peut avoir appliqué une partie du fichier avant l’erreur : vérifie la base avant de recommencer.
 
-La vue d’ensemble présente les quotas Codex utilisés et restants, leurs dates de réinitialisation et cinq projets locaux récemment utilisés, juste sous la bannière. Le relevé se renouvelle chaque minute lorsque la page est visible. Les quotas concernent tout le compte, pas uniquement ce dashboard.
+Le dashboard écoute uniquement sur `127.0.0.1` et n’est pas destiné à être exposé sur Internet. L’accès Discord protège son ouverture, mais ne constitue pas une protection contre un administrateur local capable de modifier les fichiers de l’application.
 
-Codex doit être installé et connecté sur ce PC. L’intégration utilise son exécutable local et les lectures `account/rateLimits/read` et `thread/list` de l’[App Server officiel](https://learn.chatgpt.com/docs/app-server). Elle ne démarre aucune tâche et ne lit pas le fichier d’authentification. La liste regroupe les dossiers des 200 dernières tâches non archivées par date de mise à jour ; les métadonnées locales de l’application fournissent les noms des projets et excluent les conversations sans projet lorsqu’elles sont disponibles. Les erreurs et valeurs inconnues sont affichées explicitement. Aucun relevé n’est exporté vers un service tiers par le dashboard.
+---
 
+<div align="center">
 
+**LeStitcheur Control — Ton univers. Tes règles.**
+
+</div>

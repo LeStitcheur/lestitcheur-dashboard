@@ -1,3 +1,5 @@
+import {createMysql} from './mysql-admin.js';
+import {createOperations} from './operations.js';
 import {createGithub} from './github.js';
 import {createAccess} from './access.js';
 import express from 'express';
@@ -15,14 +17,14 @@ import { terminal } from './platform.js';
 import { createConsoleHub } from './pterodactyl-console.js';
 import { createDesktopSpotify } from './spotify-desktop.js';
 import { createCloud } from './cloud.js';
-import { socialUrl } from './social.js';
+import { socialUrl, CREATOR_ACCOUNTS } from './social.js';
 import { createDiscord } from './discord.js';
 import { createCodexSummary } from './codex.js';
 import { createWorkspace } from './workspace.js';
 import { workspaceRoutes } from './workspace-routes.js';
 
 export const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.local'), dev = false, desktop = false, onSpotifyConnected, openSocial, terminalRunning = () => false, requireAuth = true } = {}) {
+export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.local'), dev = false, desktop = false, onSpotifyConnected, openSocial, onLogout, terminalRunning = () => false, requireAuth = true } = {}) {
   const app = express();
   app.disable('x-powered-by');
   const origin = `http://127.0.0.1:${port}`;
@@ -40,6 +42,8 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
   const music = () => settings.get().spotifyMode === 'desktop' ? desktopSpotify : spotify;
   const cloud = createCloud(settings, jobs, dataDir);
   const discord = createDiscord(settings, jobs);
+  const mysqlAdmin=await createMysql({directory:dataDir,settings,jobs});
+  const operations=createOperations({workspace,settings,cloud,ptero,directory:dataDir});
   const codexSummary = createCodexSummary();
   const github=createGithub({cwd:dataDir});
   let lastCpu = os.cpus();
@@ -71,13 +75,24 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
     if (!['GET', 'HEAD'].includes(req.method) && !req.is('application/json')) return res.status(415).json({ error: 'Requête JSON requise.' });
     next();
   });
+  app.use('/api/mysql/import',express.json({limit:'25mb'}));
   app.use('/api/backup/restore',express.json({limit:'3mb'}));
   app.use(express.json({ limit: '24kb' }));
   app.post('/api/access/configure',async(req,res)=>res.json(await access.configure(req.body.secret)));
   app.post('/api/access/begin',(_req,res)=>res.json(access.begin()));
-  app.post('/api/access/logout',async(_req,res)=>{await access.logout();res.json({});});
+  app.post('/api/access/logout',async(_req,res)=>{await access.logout();consoles.disconnectAll();await onLogout?.();res.json({});});
   const workspaceMonitor = workspaceRoutes(app,{workspace,settings,services,projects,jobs,ptero,cloud,music,terminalRunning,consoles});
   app.get('/api/bootstrap', (_req, res) => res.json({ app: 'lestitcheur-control', desktop, platform:process.platform, capabilities:{windowsServices:process.platform==='win32',desktopSpotify:process.platform==='win32'}, token, settings: settings.public(), spotifyRedirectUri: spotify.redirectUri }));
+  app.get('/api/mysql/config',(_req,res)=>res.json(mysqlAdmin.configured()));
+  app.post('/api/mysql/config',async(req,res)=>{if(jobs.active('mysql-admin'))throw Error('Attends la fin de l’opération MySQL.');await mysqlAdmin.configure(req.body);res.json(mysqlAdmin.configured());});
+  app.get('/api/mysql',async(_req,res)=>res.json(await mysqlAdmin.status()));
+  app.get('/api/mysql/backups',async(_req,res)=>res.json(await mysqlAdmin.backups()));
+  app.get('/api/mysql/backups/:name',async(req,res)=>res.download(await mysqlAdmin.download(req.params.name)));
+  app.post('/api/mysql/export',(req,res)=>res.json(mysqlAdmin.export(req.body.database)));
+  app.post('/api/mysql/import',(req,res)=>res.json(mysqlAdmin.import(req.body.database,req.body.sql,req.body.confirm)));
+  app.post('/api/operations/check',async(_req,res)=>{await operations.check();res.json(workspace.get());});
+  app.post('/api/domains/check',async(_req,res)=>res.json(await operations.domains()));
+  app.post('/api/workspace/read-one',async(req,res)=>{await workspace.readOne(req.body.id);res.json(workspace.get());});
   app.get('/api/state', async (_req, res) => res.json({ system: system(), terminalRunning: terminalRunning(), services: await services.status(), activities: jobs.activities(), jobs: jobs.list().map(({ output, ...job }) => job) }));
   app.get('/api/github',async(req,res)=>res.json(await github.list(req.query.page||1)));
   app.get('/api/github/:owner/:repo',async(req,res)=>res.json(await github.details(req.params.owner,req.params.repo)));
@@ -86,6 +101,7 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
   app.get('/api/codex', async (_req, res) => res.json(await codexSummary()));
   app.post('/api/settings', async (req, res) => { const previous = settings.get(); await settings.update(req.body); if (previous.pteroUrl !== settings.get().pteroUrl || previous.pteroKey !== settings.get().pteroKey) consoles.disconnectAll(); ptero.invalidate(); cloud.invalidate(); jobs.addActivity('Paramètres enregistrés', 'success'); res.json(settings.public()); });
   app.post('/api/terminal', async (req, res) => { await terminal(settings.get().projectsRoot, req.body.admin === true); jobs.addActivity(`Terminal ${req.body.admin ? 'administrateur' : 'PowerShell'} ouvert`); res.json({}); });
+  app.get('/api/projects/:name/git',async(req,res)=>res.json(await projects.gitDetails(req.params.name)));
   app.get('/api/projects/:name/release-plan', async (req,res)=>res.json(await projects.releasePlan(req.params.name)));
   app.get('/api/projects/:name/deploy-plan', async (req, res) => res.json(await projects.plan(req.params.name)));
   app.post('/api/projects/:name/action', async (req, res) => res.json(await projects.action(req.params.name, req.body.action, req.body)));
@@ -119,10 +135,10 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
   app.post('/api/vercel/:id/plan', async (req, res) => res.json(await cloud.planRedeploy(req.params.id)));
   app.post('/api/vercel/redeploy', async (req, res) => res.json(await cloud.redeploy(req.body.planId, req.body.confirm)));
   app.post('/api/social/:id/open', async (req, res) => {
-    const account = settings.get().socialAccounts.find(a => a.id === req.params.id);
+    const account = [...CREATOR_ACCOUNTS,...settings.get().socialAccounts].find(a => a.id === req.params.id);
     if (!account) throw new Error('Compte introuvable.');
     const url = socialUrl(account, req.body.target);
-    if (openSocial) { await openSocial(account, req.body.target); jobs.addActivity(`Espace ${account.platform} ouvert · @${account.handle}`); res.json({ opened: true }); }
+    if (openSocial) { await openSocial(account, req.body.target, req.body.external === true); jobs.addActivity(`Espace ${account.platform} ouvert · @${account.handle}`); res.json({ opened: true }); }
     else res.json({ opened: false, url });
   });
   app.get('/auth/spotify/callback', async (req, res) => {
@@ -143,7 +159,7 @@ export async function createApp({ port = 4317, dataDir = path.join(APP_ROOT, '.l
     res.status(400).json({ error: message });
   });
   jobs.addActivity('LeStitcheur Control est prêt', 'success');
-  return { app, access, jobs, settings, services, workspace, close: () => {workspaceMonitor.close();consoles.disconnectAll();} };
+  return { app, access, jobs, settings, services, workspace, close: () => {workspaceMonitor.close();operations.close();consoles.disconnectAll();} };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 4317);

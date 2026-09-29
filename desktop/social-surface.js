@@ -23,12 +23,14 @@ export function createSocialSurface({ window, View, accounts, protect }) {
     }
     entries.clear(); selected = '';
   }
-  function mount(accountId) {
+  function mount(accountId, targetMode) {
     const account = accounts().find(item => item.id === accountId);
     if (!account) throw new Error('Compte social introuvable.');
-    if (selected === accountId) return snapshot();
+    const targets = account.platform === 'discord' ? ['client'] : ['chatgpt','suno'].includes(account.platform) ? ['create'] : targetMode === 'publish' ? ['publish'] : ['activity','analytics'];
+    if (targetMode !== undefined && targetMode !== 'publish') throw Error('Vue inconnue.');
+    if (selected === accountId && targets.join() === [...entries.keys()].join()) return snapshot();
     close(); selected = accountId; visible = true;
-    for (const target of account.platform === 'discord' ? ['client'] : ['activity','analytics']) {
+    for (const target of targets) {
       const view = new View({ webPreferences: { partition: `persist:social-${account.id}`, sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, webviewTag: false } });
       const entry = { view, phase: 'loading', bounds: null };
       entries.set(target, entry);

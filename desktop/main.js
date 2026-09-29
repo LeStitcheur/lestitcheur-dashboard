@@ -1,3 +1,4 @@
+import {CREATOR_ACCOUNTS} from '../server/social.js';
 import {createNetworkDiscovery} from './network-discovery.js';
 import { app, BrowserWindow, WebContentsView, ipcMain, Menu, Tray, dialog, shell, nativeTheme, clipboard, screen } from 'electron';
 import { spawnPty } from './pty-process.js';
@@ -57,7 +58,7 @@ else {
   app.on('window-all-closed', () => { if (quitting) app.quit(); });
   app.whenReady().then(async () => {
     nativeTheme.themeSource = 'dark';
-    backend = await createApp({ port: PORT, desktop: true, terminalRunning: () => localTerminal?.running() || false, dataDir: app.getPath('userData'), openSocial: socialWindows.open, onSpotifyConnected: () => { showWindow(); window.loadURL(`${ORIGIN}/?spotify=connected`); } });
+    backend = await createApp({ port: PORT, desktop: true, terminalRunning: () => localTerminal?.running() || false, dataDir: app.getPath('userData'), openSocial: socialWindows.open, onLogout: () => { remoteDesktop?.disconnect(); socialSurface?.close(); socialWindows.closeAll(); }, onSpotifyConnected: () => { showWindow(); window.loadURL(`${ORIGIN}/?spotify=connected`); } });
     await new Promise((resolve, reject) => {
       httpServer = backend.app.listen(PORT, '127.0.0.1', resolve);
       httpServer.once('error', reject);
@@ -66,7 +67,7 @@ else {
     window = new BrowserWindow({ width: 1480, height: 1000, minWidth: 960, minHeight: 680, show: false, title: NAME, icon,
       backgroundColor: '#090b0e', autoHideMenuBar: true, titleBarStyle: 'hidden', titleBarOverlay: { color: '#0d1014', symbolColor: '#e9eaed', height: 36 },
       webPreferences: { preload: path.join(app.getAppPath(), 'desktop', 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, spellcheck: false, backgroundThrottling: true } });
-    socialSurface = createSocialSurface({ window, View: WebContentsView, accounts: () => [...backend.settings.get().socialAccounts, { id: 'discord-personal', platform: 'discord' }], protect: protectSocialContents });
+    socialSurface = createSocialSurface({ window, View: WebContentsView, accounts: () => [...CREATOR_ACCOUNTS, ...backend.settings.get().socialAccounts, { id: 'discord-personal', platform: 'discord' }], protect: protectSocialContents });
     const localSender = event => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url.startsWith(ORIGIN + '/');
     const trusted=event=>localSender(event)&&(!backend.access||backend.access.allowed());
     ipcMain.handle('access:open',async event=>{if(!localSender(event))throw Error('Accès refusé.');const {url}=backend.access.begin();await shell.openExternal(url);});
@@ -80,7 +81,7 @@ else {
     for(const action of ['status','save','remove','connect','disconnect','focus','fullscreen'])ipcMain.handle('remote:'+action,(event,...args)=>{if(!trusted(event))throw Error('Accès refusé.');return remoteDesktop[action](...args);});
     ipcMain.on('remote:layout',(event,input)=>{if(trusted(event))remoteDesktop.layout(input);});
     localTerminal = createTerminalPool({ settings: () => backend.settings.get(), appRoot: app.getAppPath(), spawn: spawnPty,
-      emit: data => { if (!window.webContents.isDestroyed()) window.webContents.send('terminal:data', data); },
+      emit: data => { if (!window.webContents.isDestroyed() && (!backend.access || backend.access.allowed())) window.webContents.send('terminal:data', data); },
       confirm: async () => (await dialog.showMessageBox(window, { type: 'warning', message: 'Fermer la session PowerShell actuelle ?', detail: 'Les commandes encore actives seront interrompues.', buttons: ['Annuler', 'Fermer la session'], defaultId: 0, cancelId: 0 })).response === 1,
     });
     for (const action of ['open', 'snapshot', 'list', 'remove', 'write', 'resize', 'stop']) ipcMain.handle(`terminal:${action}`, (event, ...args) => { if (!trusted(event)) throw new Error('Accès refusé.'); return localTerminal[action](...args); });

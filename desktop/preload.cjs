@@ -25,7 +25,7 @@ contextBridge.exposeInMainWorld('localTerminal', {
 });
 
 contextBridge.exposeInMainWorld('socialSurface', {
-  mount: accountId => ipcRenderer.invoke('social:mount', accountId),
+  mount: (accountId, mode) => ipcRenderer.invoke('social:mount', accountId, mode),
   layout: input => ipcRenderer.send('social:layout', input),
   close: () => ipcRenderer.send('social:close'),
   refresh: target => ipcRenderer.invoke('social:refresh', target),

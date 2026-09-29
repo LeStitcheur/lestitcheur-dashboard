@@ -1,220 +1,454 @@
-import {DiscordIdentity} from './AccessGate.jsx';
+import MysqlPage from './MysqlPage.jsx';
+
+import './operations.css';
+
+import CreatorPage from './CreatorPage.jsx';
+
+import './creator.css';
+
+import {DiscordIdentity,AccessActions} from './AccessGate.jsx';
+
 import GithubPage from './GithubPage.jsx';
+
 import './github.css';
+
 import React, { useContext, useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+
 import { Activity, ArrowDownToLine, ArrowRight, ArrowUpRight, Bell, Check, CheckCheck, ChevronRight, CircleHelp, Code2, Command, Cpu, Crown, Database, ExternalLink, FlaskConical, Folder, FolderCode, Gamepad2, Github, HardDrive, Headphones, LayoutDashboard, Link2, LoaderCircle, Menu, Monitor, MoreHorizontal, Music2, Pause, Pencil, Play, Plus, Power, Radio, RefreshCw, Repeat2, Rocket, ScanLine, Search, Server, Settings2, ShieldCheck, Shuffle, SkipBack, SkipForward, SlidersHorizontal, Square, Terminal, Trash2, Volume2, Wifi, X, Zap, AlertCircle } from 'lucide-react';
+
 import { api, setToken } from './api';
+
 import MusicPlayer from './MusicPlayer.jsx';
+
 import SocialPage from './SocialPage.jsx';
+
 import DiscordPage from './DiscordPage.jsx';
+
 import CodexSummary from './CodexSummary.jsx';
+
 import RemoteDesktop from './RemoteDesktop.jsx';
+
 import Onboarding from './Onboarding.jsx';
+
 import WorkspacePage,{ProjectDetails,widgetNames} from './WorkspacePage.jsx';
+
 const LocalTerminal = lazy(() => import('./LocalTerminal.jsx'));
+
 import { DomainsPage, VercelPage } from './CloudPages.jsx';
+
 import { Globe2, Triangle, Users, Sparkles, MessageCircle } from 'lucide-react';
+
 const PterodactylConsole = lazy(() => import('./PterodactylConsole.jsx'));
 
-const NAV = [{ id: 'dashboard', label: 'Vue d’ensemble', icon: LayoutDashboard },{id:'remote',label:'Bureau distant',icon:Monitor},{id:'workspace',label:'Mon espace',icon:SlidersHorizontal},{ id: 'servers', label: 'Mes serveurs', icon: Server }, { id: 'projects', label: 'Mes projets', icon: FolderCode }, {id:'github',label:'GitHub',icon:Github}, { id: 'terminal', label: 'Terminaux', icon: Terminal }, { id: 'music', label: 'Spotify', icon: Music2 }, { id: 'social', label: 'Mes réseaux', icon: Users }, { id: 'discord', label: 'Discord', icon: MessageCircle }, { id: 'domains', label: 'Domaines & DNS', icon: Globe2 }, { id: 'vercel', label: 'Vercel', icon: Triangle }];
-const TITLES = {github:['GitHub','Tes dépôts, tes contributions et tes publications.'],remote:['Bureau distant','Tes PC et VPS, accessibles depuis ton dashboard.'],workspace:['Mon espace','Tes sessions, tes outils et ton organisation.'], discord: ['Discord', 'Tes conversations, tes communautés et tes bots.'], social: ['Mes réseaux', 'Tes communautés. Tes conversations. Ton espace.'], domains: ['Domaines & DNS', 'Tes domaines Hostinger, sous contrôle.'], vercel: ['Vercel', 'Du dernier commit à la mise en ligne.'], dashboard: ['Ton quartier général', 'Tout ce qui compte pour ta prochaine session.'], servers: ['Mes serveurs', 'Du local au VPS, garde la main sur tes serveurs.'], projects: ['Mes projets', 'Tes idées, ton code, ton espace de travail.'], terminal: ['Terminaux', 'Une commande d’avance.'], music: ['Ta musique', 'La bonne bande-son pour ta session.'], settings: ['Paramètres', 'Configure ton espace de commande.'], activity: ['Journal d’activité', 'Retrouve les opérations de cette session.'] };
+
+
+const NAV = [{ id: 'dashboard', label: 'Vue d’ensemble', icon: LayoutDashboard },{id:'remote',label:'Bureau distant',icon:Monitor},{id:'workspace',label:'Mon espace',icon:SlidersHorizontal},{ id: 'servers', label: 'Mes serveurs', icon: Server }, { id: 'projects', label: 'Mes projets', icon: FolderCode }, {id:'github',label:'GitHub',icon:Github},{id:'mysql',label:'Bases MySQL',icon:Database}, { id: 'terminal', label: 'Terminaux', icon: Terminal }, { id: 'music', label: 'Spotify', icon: Music2 }, {id:'images',label:'ChatGPT Images',icon:Sparkles},{id:'suno',label:'Studio Suno',icon:Music2}, { id: 'social', label: 'Mes réseaux', icon: Users }, { id: 'discord', label: 'Discord', icon: MessageCircle }, { id: 'domains', label: 'Domaines & DNS', icon: Globe2 }, { id: 'vercel', label: 'Vercel', icon: Triangle }];
+
+const TITLES = {images:['ChatGPT Images','Ton espace de création visuelle.'],suno:['Studio Suno','Tes idées prennent une voix.'],mysql:['Bases MySQL','Tes bases locales, leurs sauvegardes et leurs connexions.'],github:['GitHub','Tes dépôts, tes contributions et tes publications.'],remote:['Bureau distant','Tes PC et VPS, accessibles depuis ton dashboard.'],workspace:['Mon espace','Tes sessions, tes outils et ton organisation.'], discord: ['Discord', 'Tes conversations, tes communautés et tes bots.'], social: ['Mes réseaux', 'Tes communautés. Tes conversations. Ton espace.'], domains: ['Domaines & DNS', 'Tes domaines Hostinger, sous contrôle.'], vercel: ['Vercel', 'Du dernier commit à la mise en ligne.'], dashboard: ['Ton quartier général', 'Tout ce qui compte pour ta prochaine session.'], servers: ['Mes serveurs', 'Du local au VPS, garde la main sur tes serveurs.'], projects: ['Mes projets', 'Tes idées, ton code, ton espace de travail.'], terminal: ['Terminaux', 'Une commande d’avance.'], music: ['Ta musique', 'La bonne bande-son pour ta session.'], settings: ['Paramètres', 'Configure ton espace de commande.'], activity: ['Journal d’activité', 'Retrouve les opérations de cette session.'] };
+
 const fmtGB = bytes => `${((bytes || 0) / 1024 ** 3).toFixed(1)} Go`;
+
 const fmtTime = ms => `${Math.floor((ms || 0) / 60000)}:${String(Math.floor(((ms || 0) % 60000) / 1000)).padStart(2, '0')}`;
+
 const hour = value => new Date(value).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
 const countLabel = n => `${n} projet${n > 1 ? 's' : ''}`;
+
 function SpotifyMark({ size = 20 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="12"/><path d="M5.4 8.6c4.5-1.4 9-1 13 1.3M6.1 12c3.8-1.1 7.5-.7 11 1.1M6.9 15.3c3-.8 6-.5 8.9.9" fill="none" stroke="#0e1812" strokeWidth="1.8" strokeLinecap="round"/></svg>; }
+
 function Badge({ children, tone = 'neutral', dot = true }) { return <span className={`badge ${tone}`}>{dot && <i />}{children}</span>; }
+
 function IconButton({ icon: Icon, label, ...props }) { return <button type="button" className="icon-button" title={label} aria-label={label} {...props}><Icon size={17} /></button>; }
+
 function Empty({ icon: Icon = Folder, title, text, children }) { return <div className="empty"><div className="empty-icon"><Icon size={26} /></div><h3>{title}</h3><p>{text}</p>{children}</div>; }
+
 function Modal({ title, children, close, wide = false, consoleView = false }) {
+
   const ref = useRef(null);
+
   useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => dialog.close(); }, []);
+
   return <dialog ref={ref} className={`modal ${wide ? 'wide' : ''} ${consoleView ? 'ptero-console-dialog' : ''}`} aria-label={title} onCancel={close} onClick={event => { if (event.target === ref.current) close(); }}><header><h2>{title}</h2><IconButton icon={X} label="Fermer" onClick={close} /></header>{children}</dialog>;
+
 }
+
+
 
 export default function App() {
+
   const discordIdentity=useContext(DiscordIdentity);
+
+  const accessActions=useContext(AccessActions);
+
   const [page, setPage] = useState('dashboard');
+
   const [workspace,setWorkspace]=useState(null),[workspaceTab,setWorkspaceTab]=useState('sessions');
+
   const notificationSeen=useRef(null);
+
   const refreshWorkspace=useCallback(async()=>setWorkspace(await api('/workspace')),[]);
+
   const openTerminal=(project,command)=>{setTerminalRequest({project:project||null,command,key:Date.now()});navigate('terminal');};
+
   const openWorkspace=tab=>{setWorkspaceTab(tab);navigate('workspace');};
+
   const [terminalRequest, setTerminalRequest] = useState(null);
+
   const [terminalVisited, setTerminalVisited] = useState(false);
+
   const [sidebar, setSidebar] = useState(false);
+
   const [settings, setSettings] = useState(null);
+
   const [desktop, setDesktop] = useState(false);
+
   const [platform,setPlatform]=useState('win32');
+
   const [state, setState] = useState(null);
+
   const [projects, setProjects] = useState([]);
+
   const [ptero, setPtero] = useState({ connected: false, servers: [] });
+
   const [spotify, setSpotify] = useState({ connected: false });
+
   const [errors, setErrors] = useState({});
+
   const [fatal, setFatal] = useState('');
+
   const [busy, setBusy] = useState('');
+
   const [toast, setToast] = useState(null);
+
   const [modal, setModal] = useState(null);
+
   const [input, setInput] = useState('');
+
   const [query, setQuery] = useState('');
+
   const [projectFilter, setProjectFilter] = useState('all');
+
   const [serverTab, setServerTab] = useState('local');
+
   const [job, setJob] = useState(null);
+
   const [logProject,setLogProject]=useState('');
+
   const [now, setNow] = useState(new Date());
+
   const toastTimer = useRef();
+
   const loading = useRef(false);
+
   const notice = useCallback((message, type = 'success') => { clearTimeout(toastTimer.current); setToast({ message, type }); toastTimer.current = setTimeout(() => setToast(null), 6500); }, []);
+
   const navigate = useCallback(id => { if(id === 'terminal')setTerminalVisited(true); setPage(id); setSidebar(false); setQuery(''); window.scrollTo({ top: 0 }); }, []);
+
   const load = useCallback(async (all = true) => {
+
     if (loading.current) return;
+
     loading.current = true;
+
     const tasks = [['workspace','/workspace',setWorkspace],['state', '/state', setState], ['spotify', '/spotify', setSpotify]];
+
     if (all) tasks.push(['projects', '/projects', setProjects], ['ptero', '/pterodactyl', setPtero]);
+
     await Promise.all(tasks.map(async ([key, route, setter]) => {
+
       try { const data = await api(route); setter(data); setErrors(prev => ({ ...prev, [key]: '' })); }
+
       catch (error) { setErrors(prev => ({ ...prev, [key]: error.message })); }
+
     }));
+
     loading.current = false;
+
   }, []);
+
   useEffect(() => {
+
     let active = true;
+
     api('/bootstrap').then(data => { if (!active) return; setToken(data.token); setSettings(data.settings); setDesktop(!!data.desktop);setPlatform(data.platform||'win32'); load(); const result = new URLSearchParams(location.search).get('spotify'); if (result) { notice(result === 'connected' ? 'Ton compte Spotify est connecté.' : 'La connexion Spotify a échoué. Consulte le journal.', result === 'connected' ? 'success' : 'error'); history.replaceState({}, '', '/'); } }).catch(error => { if (active) setFatal(error.message); });
+
     return () => { active = false; };
+
   }, [load, notice]);
+
   useEffect(() => { if (!settings) return; const timer = setInterval(() => { if (!document.hidden) load(); }, 12000); return () => clearInterval(timer); }, [!!settings, load]);
+
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 30000); return () => clearInterval(timer); }, []);
+
   useEffect(() => { const listener = e => { if (!e.target.closest?.('.local-terminal-host') && (e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setModal({ type: 'search' }); setInput(''); } }; window.addEventListener('keydown', listener); return () => window.removeEventListener('keydown', listener); }, []);
+
   useEffect(() => {
+
     if (modal?.type !== 'job') return;
+
     let active = true;
+
     const read = async () => { try { const data = await api(`/jobs/${modal.id}`); if (active) setJob(data); } catch (err) { if (active) notice(err.message, 'error'); } };
+
     read(); const timer = setInterval(read, 1500);
+
     return () => { active = false; clearInterval(timer); };
+
   }, [modal?.type, modal?.id, notice]);
+
   async function act(key, route, data, message) {
+
     if (busy) return;
+
     setBusy(key);
+
     try { const result = await api(route, data); if (result.jobId) { setJob(null); setModal({ type: 'job', id: result.jobId }); } else if (message) notice(message); await load(); return result; }
+
     catch (error) { notice(error.message, 'error'); return null; }
+
     finally { setBusy(''); }
+
   }
+
   function projectAction(project, action) {
+
     if(action === 'terminal' && window.localTerminal){ setTerminalRequest({project:project.name,key:Date.now()}); navigate('terminal'); return; }
+
     if (['rename', 'delete', 'deploy', 'release', 'analyze', 'test-deploy'].includes(action)) {
+
       setInput(action === 'rename' ? project.name : '');
+
       setModal({ type: action, project });
+
       if (['deploy','release'].includes(action)) api(`/projects/${encodeURIComponent(project.name)}/${action}-plan`).then(plan => setModal(prev => prev?.type === action && prev.project.name === project.name ? { ...prev, plan } : prev)).catch(error => setModal(prev => prev?.type === action && prev.project.name === project.name ? { ...prev, error: error.message } : prev));
+
     } else act(`${project.name}:${action}`, `/projects/${encodeURIComponent(project.name)}/action`, { action }, action === 'terminal' ? 'Terminal ouvert à la racine du projet.' : 'Projet ouvert dans VS Code.');
+
   }
+
   async function confirmProject() {
+
     const current = modal;
+
     const result = await act(current.type, `/projects/${encodeURIComponent(current.project.name)}/action`, { action: current.type, newName: input, confirm: input, fingerprint: current.plan?.fingerprint }, current.type === 'rename' ? 'Dossier renommé.' : current.type === 'delete' ? 'Dossier déplacé dans la Corbeille.' : undefined);
+
     if (result && !result.jobId) setModal(null);
+
   }
+
   async function connectSpotify() {
+
     if (!settings?.spotifyClientId) { navigate('settings'); notice('Renseigne ton Client ID dans la section Spotify.', 'info'); return; }
+
     const result = await act('spotify-connect', '/spotify/connect', {});
+
     if (result?.url) location.assign(result.url);
+
   }
+
   function startStack(target = 'stack') {
+
     if(platform!=='win32'){notice('Le lancement local de Laragon / FiveM nécessite Windows. Utilise le terminal ou Pterodactyl.','info');return;}
+
     if (!state?.services.mysqlConfigured && !state?.services.mysql) { navigate('settings'); notice('Renseigne ton installation MySQL dans Serveur local.', 'info'); return; }
+
     act(`start-${target}`, '/services/start', { target });
+
   }
+
   useEffect(()=>{if(!workspace)return;const latest=workspace.notifications[0];if(notificationSeen.current&&latest?.id!==notificationSeen.current&&!workspace.quiet&&latest?.source==='monitor')notice(latest.message,latest.type);notificationSeen.current=latest?.id||'empty';},[workspace,notice]);
+
   const local = state?.services || {};
+
   const onlineCount = Number(!!local.mysql) + Number(!!local.fivem) + ptero.servers.filter(s => s.status === 'running').length;
+
   const visibleProjects = [...projects].sort((a,b)=>Number(workspace?.favorites.includes(b.name))-Number(workspace?.favorites.includes(a.name))).filter(p => p.name.toLowerCase().includes(query.toLowerCase()) && (projectFilter !== 'git' || p.git) && (projectFilter !== 'node' || p.scripts.length > 0));
+
   const system = state?.system;
 
+
+
   function LocalServers() {
+
     if(platform!=='win32')return <div className="card-pad"><p>Le lanceur Laragon / FiveM local nécessite Windows. Les serveurs Pterodactyl restent accessibles depuis ce système.</p><button className="button secondary" onClick={()=>navigate('terminal')}>Ouvrir le terminal</button></div>;
+
     return <><div className="service-row"><div className="service-icon mysql"><Database size={24} /></div><div className="service-info"><h3>MySQL <span>{local.mysqlMode === 'laragon' ? 'LARAGON' : 'BASE DE DONNÉES'}</span></h3><p>127.0.0.1 <b>:</b> {local.mysqlPort || 3306}</p></div><Badge tone={local.mysql ? 'green' : 'neutral'}>{local.mysql ? 'En ligne' : 'Arrêté'}</Badge><IconButton icon={Play} label="Démarrer MySQL" disabled={!!busy || local.mysql || local.starting} onClick={() => startStack('mysql')} /></div>
+
       <div className="service-row"><div className="service-icon fivem"><Gamepad2 size={25} /></div><div className="service-info"><h3>FiveM <span>SERVEUR LOCAL</span></h3><p>{settings.fivemCwd?.split(/[\\/]/).filter(Boolean).pop()||'À configurer'} <ChevronRight size={11} /> txAdmin</p></div><Badge tone={local.fivem ? 'green' : local.txAdmin || local.fivemProcess ? 'amber' : 'neutral'}>{local.fivem ? 'En ligne' : local.txAdmin ? 'txAdmin actif' : local.fivemProcess ? 'Démarrage' : 'Arrêté'}</Badge><IconButton icon={local.fivemManaged ? Square : Play} label={local.fivemManaged ? 'Arrêter FiveM' : 'Démarrer MySQL puis FiveM'} disabled={!!busy || local.starting || (!!local.txAdmin && !local.fivemManaged)} onClick={() => local.fivemManaged ? setModal({ type: 'stop-fivem' }) : startStack()} /></div>
+
       <div className="server-footer"><span><Link2 size={14} /> MySQL d’abord, FiveM ensuite.</span>{local.txAdmin ? <a className="text-link" href={`http://127.0.0.1:${local.txAdminPort}`} target="_blank" rel="noreferrer">Ouvrir txAdmin <ArrowUpRight size={15} /></a> : <button className="text-link" onClick={() => navigate('settings')}>Configurer <ArrowUpRight size={15} /></button>}</div></>;
+
   }
+
   function PteroServers({ compact = false } = {}) {
+
     if (errors.ptero) return <Empty icon={AlertCircle} title="Connexion au panel impossible" text={errors.ptero}><button className="button secondary" onClick={() => navigate('settings')}>Vérifier la connexion</button></Empty>;
+
     if (!ptero.connected) return <Empty icon={Server} title="Ton VPS t’attend" text="Connecte ton panel Pterodactyl pour retrouver tes serveurs et les piloter ici."><button className="button secondary" onClick={() => navigate('settings')}><Plus size={16} /> Connecter mon panel</button></Empty>;
+
     if (!ptero.servers.length) return <Empty icon={Server} title="Aucun serveur accessible" text="Vérifie les permissions de ta clé API Client." />;
+
     const consoleButton = server => <button className="button small secondary remote-console-button" aria-label={`Console de ${server.name}`} onClick={() => setModal({ type: 'ptero-console', server })}><Terminal size={14} /> Console</button>;
+
     return <div className="remote-list">{ptero.servers.slice(0, compact ? 3 : undefined).map(server => <div className="remote-server" key={server.id}>
+
       <div className="remote-top"><div className="service-icon"><Server size={22} /></div><div className="service-info"><h3>{server.name}</h3><p>{server.node}</p></div><Badge tone={server.status === 'running' ? 'green' : server.status === 'starting' ? 'amber' : 'neutral'}>{({ running: 'En ligne', offline: 'Arrêté', starting: 'Démarrage', stopping: 'Arrêt', unknown: 'Indisponible' })[server.status] || server.status}</Badge>{compact && consoleButton(server)}</div>
+
       {!compact && <><div className="remote-metrics"><span>CPU <strong>{server.cpu == null ? '—' : `${server.cpu.toFixed(1)} %`}</strong></span><span>Mémoire <strong>{server.memory == null ? '—' : fmtGB(server.memory)}</strong></span><span>Disque <strong>{server.disk == null ? '—' : fmtGB(server.disk)}</strong></span></div>{server.error && <p className="inline-error">{server.error}</p>}
+
         <div className="remote-actions">{consoleButton(server)}<button className="button small secondary" disabled={!!busy || server.suspended || server.status === 'running'} onClick={() => act('ptero-power', `/pterodactyl/${server.id}/power`, { signal: 'start' }, 'Démarrage demandé.')}><Play size={14} /> Démarrer</button><IconButton icon={RefreshCw} label={`Redémarrer ${server.name}`} disabled={!!busy || server.suspended} onClick={() => setModal({ type: 'ptero-power', server, signal: 'restart' })} /><IconButton icon={Square} label={`Arrêter ${server.name}`} disabled={!!busy || server.suspended} onClick={() => setModal({ type: 'ptero-power', server, signal: 'stop' })} /><a className="icon-button" title="Ouvrir le panel" aria-label="Ouvrir le panel" href={server.panelUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} /></a></div>
+
       </>}
+
     </div>)}</div>;
+
   }
+
   function SpotifyCard({ large = false } = {}) { return <MusicPlayer spotify={spotify} settings={settings} busy={busy} error={errors.spotify} act={act} connect={connectSpotify} large={large} />; }
+
   function ProjectsTable({ compact = false } = {}) {
+
     const items = compact ? visibleProjects.slice(0, 4) : visibleProjects;
+
     return <section data-widget="projects" className="card projects-card"><div className="card-heading"><h2><FolderCode size={18} /> Mes projets <span className="number-tag">{projects.length}</span></h2>{compact ? <button className="text-link muted" onClick={() => navigate('projects')}>Tout voir <ArrowUpRight size={15} /></button> : <button className="button small secondary" disabled={!!busy} onClick={() => load()}><RefreshCw size={14} /> Actualiser</button>}</div><div className="project-toolbar"><div className="mini-search"><Search size={15} /><input aria-label="Rechercher un projet" placeholder="Rechercher un projet…" value={query} onChange={e => setQuery(e.target.value)} /></div><select aria-label="Filtrer les projets" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">Tous les projets</option><option value="git">Dépôts Git</option><option value="node">Projets Node.js</option></select></div>
+
       {errors.projects ? <p className="inline-error">{errors.projects}</p> : !items.length ? <Empty title={query ? 'Aucun résultat' : 'Aucun projet'} text={query ? 'Essaie un autre nom ou un autre filtre.' : 'Les dossiers de ton répertoire dev apparaîtront ici.'} /> : <div className="project-table-wrap"><table className="project-table"><thead><tr><th>PROJET</th><th>ENVIRONNEMENT</th><th>ACTIONS</th></tr></thead><tbody>{items.map(project => <tr key={project.name}><td><div className="project-name"><div className={`folder-tile ${project.stack === 'React' || project.stack === 'Next.js' ? 'react' : project.stack === 'Discord.js' ? 'discord' : ''}`}><FolderCode size={19} /></div><div><strong>{project.name}</strong><span>{project.git ? <><Github size={11} /> {project.branch || 'Git'}</> : <><Folder size={11} /> Dossier local</>}{project.protected && ' · Ce panel'}</span></div></div></td><td><span className="stack-label"><i className={project.stack === 'React' ? 'react' : project.stack === 'Discord.js' ? 'discord' : ''} />{project.stack}</span></td><td><div className="project-actions"><IconButton icon={Code2} label={`Ouvrir ${project.name} dans VS Code`} disabled={!!busy} onClick={() => projectAction(project, 'vscode')} /><IconButton icon={Terminal} label={`Terminal · ${project.name}`} disabled={!!busy} onClick={() => projectAction(project, 'terminal')} /><button className="button secondary small" disabled={!!busy||!project.deployable} onClick={()=>projectAction(project,'deploy')}>Push GitHub</button><button className="button secondary small" disabled={!!busy||!project.deployable} onClick={()=>projectAction(project,'release')}>Publier une release</button><IconButton icon={ScanLine} label={`Analyser ${project.name}`} disabled={!!busy} onClick={() => projectAction(project, 'analyze')} /><IconButton icon={FlaskConical} label={`Tester le déploiement de ${project.name}`} disabled={!!busy} onClick={() => projectAction(project, 'test-deploy')} /><span className="action-divider" /><IconButton icon={Pencil} label={`Renommer ${project.name}`} disabled={!!busy || project.protected} onClick={() => projectAction(project, 'rename')} /><IconButton icon={Trash2} label={`Supprimer ${project.name}`} disabled={!!busy || project.protected} onClick={() => projectAction(project, 'delete')} /></div></td></tr>)}</tbody></table></div>}<div className="project-bottom"><span><Folder size={12} /> {settings?.projectsRoot}</span><span>{countLabel(projects.length)}</span></div></section>;
+
   }
+
   function Activities({ full = false } = {}) {
+
     const entries = state?.activities || [];
+
     return <section data-widget="activity" className="card activity-card"><div className="card-heading"><h2><Activity size={18} /> Activité récente</h2>{!full && <IconButton icon={ArrowUpRight} label="Voir toute l’activité" onClick={() => navigate('activity')} />}</div><div className="activity-list">{entries.slice(0, full ? 100 : 5).map(entry => <div className="activity-item" key={entry.id}><div className={`activity-symbol ${entry.type}`}>{entry.type === 'success' ? <Check size={13} /> : entry.type === 'error' ? <X size={13} /> : <Terminal size={13} />}</div><div><p>{entry.message}</p><time>{hour(entry.time)}</time></div></div>)}</div>{!entries.length && <p className="muted activity-placeholder">Tes prochaines actions apparaîtront ici.</p>}<div className="activity-bottom"><i className="live-dot" /> Journal de la session</div></section>;
+
   }
+
+
 
   if (fatal) return <main className="fatal"><Crown size={40} /><h1>Le panel est hors ligne</h1><p>{fatal}</p><button className="button primary" onClick={() => location.reload()}>Réessayer</button></main>;
-  return <div className={`app-shell ${desktop ? 'desktop-shell' : ''}`}>{desktop && <div className="desktop-titlebar"><img src="/emblem.svg" alt=""/><span>LeStitcheur Control</span><small>PERSONAL WORKSPACE</small></div>}<aside className={`sidebar ${sidebar ? 'open' : ''}`}><button className="discord-profile" onClick={()=>navigate('discord')} title="Ouvrir Discord"><span className="discord-profile-avatar">{discordIdentity?.avatarUrl?<img src={discordIdentity.avatarUrl} alt="" onError={e=>{e.currentTarget.style.display='none';}}/>:<MessageCircle size={24}/>}</span><span className="discord-profile-text"><strong>{discordIdentity?.displayName||discordIdentity?.username||'Mon compte Discord'}</strong><small>{discordIdentity?.username||'Profil indisponible'}</small></span></button><div className="workspace-label"><span>ESPACE PERSONNEL</span><span className="version">2.7</span></div><nav aria-label="Navigation principale">{NAV.map(item => <button key={item.id} className={`nav-item ${page === item.id ? 'active' : ''}`} onClick={() => navigate(item.id)}><item.icon size={19} /><span>{item.label}</span>{item.id === 'projects' && <small>{projects.length || '—'}</small>}{item.id === 'music' && <span className="spotify-dot" />}</button>)}</nav><div className="sidebar-section">OUTILS & PRÉFÉRENCES</div><button className={`nav-item ${page === 'activity' ? 'active' : ''}`} onClick={() => navigate('activity')}><Activity size={19} /><span>Activité</span></button><button className={`nav-item ${page === 'settings' ? 'active' : ''}`} onClick={() => navigate('settings')}><Settings2 size={19} /><span>Paramètres</span></button><div className="sidebar-bottom"><div className="machine-box"><div className="machine-icon"><Monitor size={19} /><i className={errors.state ? 'offline' : ''} /></div><div><strong>Poste local</strong><span>{system?.hostname || 'Connexion…'}</span></div><ShieldCheck size={16} /></div><div className="sidebar-signature"><Crown size={12} /> Ton univers. Tes règles.</div></div></aside>{sidebar && <button className="sidebar-backdrop" aria-label="Fermer le menu" onClick={() => setSidebar(false)} />}
+
+  return <div className={`app-shell ${desktop ? 'desktop-shell' : ''}`}>{desktop && <div className="desktop-titlebar"><img src="/emblem.svg" alt=""/><span>LeStitcheur Control</span><small>PERSONAL WORKSPACE</small></div>}<aside className={`sidebar ${sidebar ? 'open' : ''}`}><button className="discord-profile" onClick={()=>navigate('discord')} title="Ouvrir Discord"><span className="discord-profile-avatar">{discordIdentity?.avatarUrl?<img src={discordIdentity.avatarUrl} alt="" onError={e=>{e.currentTarget.style.display='none';}}/>:<MessageCircle size={24}/>}</span><span className="discord-profile-text"><strong>{discordIdentity?.displayName||discordIdentity?.username||'Mon compte Discord'}</strong><small>{discordIdentity?.username||'Profil indisponible'}</small></span></button><div className="workspace-label"><span>ESPACE PERSONNEL</span><span className="version">2.9</span></div><nav aria-label="Navigation principale">{NAV.map(item => <button key={item.id} className={`nav-item ${page === item.id ? 'active' : ''}`} onClick={() => navigate(item.id)}><item.icon size={19} /><span>{item.label}</span>{item.id === 'projects' && <small>{projects.length || '—'}</small>}{item.id === 'music' && <span className="spotify-dot" />}</button>)}</nav><div className="sidebar-section">OUTILS & PRÉFÉRENCES</div><button className={`nav-item ${page === 'activity' ? 'active' : ''}`} onClick={() => navigate('activity')}><Activity size={19} /><span>Activité</span></button><button className={`nav-item ${page === 'settings' ? 'active' : ''}`} onClick={() => navigate('settings')}><Settings2 size={19} /><span>Paramètres</span></button><button className="nav-item" onClick={()=>accessActions?.logout()}><ShieldCheck size={19}/><span>Se déconnecter</span></button><div className="sidebar-bottom"><div className="machine-box"><div className="machine-icon"><Monitor size={19} /><i className={errors.state ? 'offline' : ''} /></div><div><strong>Poste local</strong><span>{system?.hostname || 'Connexion…'}</span></div><ShieldCheck size={16} /></div><div className="sidebar-signature"><Crown size={12} /> Ton univers. Tes règles.</div></div></aside>{sidebar && <button className="sidebar-backdrop" aria-label="Fermer le menu" onClick={() => setSidebar(false)} />}
+
     <div className="main-shell"><header className="topbar"><div className="breadcrumb"><button className="mobile-menu icon-button" aria-label="Ouvrir le menu" onClick={() => setSidebar(true)}><Menu size={21} /></button><span>Espace personnel</span><ChevronRight size={14} /><strong>{TITLES[page][0]}</strong></div><div className="topbar-right"><button aria-label="Rechercher une page ou un projet" className="global-search" onClick={() => { setInput(''); setModal({ type: 'search' }); }}><Search size={16} /><span>Rechercher…</span><kbd>Ctrl K</kbd></button><span className="topbar-divider" /><IconButton icon={Bell} label="Notifications" onClick={() => openWorkspace('notifications')} />{workspace?.notifications.some(n=>!n.read)&&<span className="notification-count">{workspace.notifications.filter(n=>!n.read).length}</span>}<button className="avatar" title="Paramètres de mon espace" aria-label="Paramètres de mon espace" onClick={() => navigate('settings')}><img src="/emblem.svg" alt=""/></button></div></header>
+
       <main className="content"><div className="page-heading"><div><div className="eyebrow page-eyebrow">WORKSPACE / LESTITCHEUR</div><h1>{TITLES[page][0]}<span className="title-dot">.</span></h1><p>{TITLES[page][1]}</p></div><div className="page-tools"><span className="date-label">{now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span><button className="button secondary small" disabled={!!busy || !settings} onClick={() => load()}><RefreshCw size={14} /> Actualiser</button></div></div>
+
       {errors.state && <div className="connection-warning"><AlertCircle size={17} /> Connexion locale perdue. Les données affichées peuvent être anciennes. <button onClick={() => location.reload()}>Recharger</button></div>}
+
       {!settings ? <div className="loading-state"><LoaderCircle className="spin" /> Connexion à ton espace…</div> : settings.setupComplete===false ? <Onboarding settings={settings} platform={platform} onDone={value=>{setSettings(value);load();}}/> : <>
+
       {page === 'dashboard' && <><div className="workspace-shortcuts"><button onClick={()=>openWorkspace('sessions')}>Mes sessions</button><button onClick={()=>openWorkspace('home')}>Personnaliser l’accueil</button>{workspace?.favorites.map(name=><button key={name} onClick={()=>openTerminal(name)}>★ {name}</button>)}</div><style>{Object.keys(widgetNames).map(id=>`.customizable-dashboard [data-widget=${id}]{order:${workspace?.widgets.indexOf(id)??0};${workspace&&!workspace.widgets.includes(id)?'display:none !important;':''}}`).join('')}</style><div className="customizable-dashboard"><section className="session-hero"><div className="session-copy"><span className="hero-chip"><i /> TON PC. TES PROJETS. TES RÈGLES.</span><h2>Prêt pour la<br /><em>prochaine session ?</em></h2><p>Un espace pour créer, gérer tes serveurs<br />et rester connecté à tes communautés.</p><div className="session-actions"><button className="button primary" disabled={!!busy || local.starting || !!errors.state} onClick={() => startStack()}>{local.starting ? <LoaderCircle size={17} className="spin" /> : <Play size={16} fill="currentColor" />}{local.starting ? 'Démarrage…' : 'Lancer MySQL + FiveM'}</button><button className="button ghost" onClick={() => navigate('projects')}>Mes projets<ArrowUpRight size={16} /></button></div></div><div className="session-visual"><img src="/banner.png" alt="Univers LeStitcheurFou, studio noir et rouge" /><div className="session-visual-label"><span>LESTITCHEURFOU</span><small>BUILT FOR YOUR FLOW.</small></div></div></section><div data-widget="codex"><CodexSummary/></div><div data-widget="launchers" className="workspace-launchers">{[{page:'servers',label:'Infrastructure',text:'Local & Pterodactyl',icon:Server},{page:'social',label:'Mes communautés',text:(settings.socialAccounts?.length || 0)+' comptes, un espace',icon:Users},{page:'domains',label:'Domaines & DNS',text:settings.hostingerConfigured?'Hostinger configuré':'Connecter Hostinger',icon:Globe2},{page:'vercel',label:'Déploiements',text:settings.vercelConfigured?'Vercel configuré':'Connecter Vercel',icon:Triangle}].map(item=><button key={item.page} onClick={()=>navigate(item.page)}><div><item.icon size={20}/></div><span><strong>{item.label}</strong><small>{item.text}</small></span><ArrowUpRight size={16}/></button>)}</div>
+
         <div data-widget="stats" className="stats-grid"><div className="stat-card"><div className="stat-icon red"><Server size={19} /></div><div><p>Serveurs en ligne</p><div className="stat-value">{state && !errors.state && !errors.ptero ? String(onlineCount).padStart(2, '0') : '—'}<span> / {2 + ptero.servers.length}</span></div></div><span className="stat-detail"><i className={onlineCount ? 'live-dot' : 'neutral-dot'} /> {onlineCount ? 'En activité' : 'Au repos'}</span></div><div className="stat-card"><div className="stat-icon blue"><FolderCode size={19} /></div><div><p>Projets locaux</p><div className="stat-value">{String(projects.length).padStart(2, '0')}<span>projets</span></div></div><span className="stat-detail">Bureau / dev</span></div><div className="stat-card"><div className="stat-icon violet"><Cpu size={19} /></div><div><p>Processeur</p><div className="stat-value">{system?.cpu ?? '—'}<span>%</span></div></div><div className="mini-meter"><div style={{ width: `${system?.cpu || 0}%` }} /></div></div><div className="stat-card"><div className="stat-icon amber"><HardDrive size={19} /></div><div><p>Mémoire utilisée</p><div className="stat-value">{system ? (system.memoryUsed / 1024 ** 3).toFixed(1) : '—'}<span>Go</span></div></div><span className="stat-detail">sur {fmtGB(system?.memoryTotal)}</span></div></div>
+
         <div className="dashboard-grid"><section data-widget="servers" className="card servers-card"><div className="card-heading"><h2><Server size={18} /> Mes serveurs</h2><button className="text-link muted" onClick={() => navigate('servers')}>Gérer <ArrowUpRight size={15} /></button></div><div className="tabs"><button className={serverTab === 'local' ? 'selected' : ''} onClick={() => setServerTab('local')}><Monitor size={14} /> Serveur local <span>2</span></button><button className={serverTab === 'vps' ? 'selected' : ''} onClick={() => setServerTab('vps')}><Server size={14} /> VPS · Pterodactyl <span>{ptero.servers.length}</span></button></div>{serverTab === 'local' ? LocalServers() : PteroServers({ compact: true })}</section><div data-widget="music">{SpotifyCard({})}</div>{ProjectsTable({ compact: true })}{Activities()}</div>
+
         <section data-widget="terminal" className="quick-terminal"><div className="quick-terminal-title"><div><Terminal size={22} /></div><span><strong>Une commande à lancer ?</strong><small>Ton terminal, à un clic de ton flow.</small></span></div><div><button className="button secondary" disabled={!!busy} onClick={() => navigate('terminal')}><Terminal size={16} /> Terminal <ArrowUpRight size={14} /></button><button className="button secondary" disabled={!!busy} onClick={() => act('terminal-admin', '/terminal', { admin: true }, 'Terminal administrateur demandé.')}><ShieldCheck size={16} /> Administrateur <ArrowUpRight size={14} /></button></div></section></div></>}
+
+      {page === 'mysql' && <MysqlPage/>}
+
       {page === 'github' && <GithubPage projects={projects} projectAction={projectAction}/>}
+
       {page === 'remote' && <RemoteDesktop suspended={!!modal||sidebar} notice={notice}/>}
+
       {page === 'workspace' && workspace && <WorkspacePage key={workspaceTab} initialTab={workspaceTab} data={workspace} refresh={refreshWorkspace} notice={notice} projects={projects} accounts={settings.socialAccounts||[]} navigate={navigate} openTerminal={openTerminal} onSettings={setSettings}/>}
+
       {page === 'servers' && <div className="servers-page"><section className="card"><div className="card-heading"><h2><Monitor size={19} /> Serveur local</h2><Badge tone="red">Windows</Badge></div>{LocalServers()}<div className="card-pad"><button className="button primary" disabled={!!busy || local.starting || !!errors.state} onClick={() => startStack()}><Zap size={16} /> Démarrer MySQL puis FiveM</button><p className="field-help">{settings.fivemCwd}</p></div></section><section className="card"><div className="card-heading"><h2><Server size={19} /> Serveurs Pterodactyl</h2><button className="text-link" onClick={() => navigate('settings')}>Configurer <Settings2 size={15} /></button></div>{PteroServers()}</section></div>}
+
       {page === 'projects' && <><div className="section-note"><Folder size={16} /><span>{settings.projectsRoot}</span><button className="text-link" onClick={() => navigate('settings')}>Changer le dossier <ArrowUpRight size={14} /></button></div>{ProjectsTable()}<ProjectDetails projects={visibleProjects} openTerminal={openTerminal} openLogs={name=>{setLogProject(name);navigate('activity');}}/><div className="helper-note"><ShieldCheck size={16} /><p>Les suppressions passent par la Corbeille. « Tester le déploiement » exécute le build local. « Publier sur GitHub » envoie les commits existants vers le remote origin.</p></div></>}
+
       {terminalVisited && <Suspense fallback={<p>Chargement du terminal…</p>}><LocalTerminal visible={page === 'terminal'} request={terminalRequest} commands={workspace?.commands||[]} onAdmin={() => act('terminal-admin', '/terminal', { admin: true }, 'Terminal administrateur demandé.')}/></Suspense>}
+
       {page === 'music' && <div className="music-page">{SpotifyCard({ large: true })}<section className="card music-guide"><div className="card-heading"><h2><Monitor size={18} /> Spotify, sur ton PC</h2></div><div className="card-pad"><span className="eyebrow">PAS BESOIN DE CLÉ API</span><h3>Ta musique.<br />Sans détour.</h3><p>Le dashboard retrouve la session Spotify Windows et affiche le morceau, l’artiste et la progression.</p><div className="music-step"><span>01</span><div><strong>Ouvre ton application Spotify</strong><p>Utilise ton compte déjà connecté sur ce PC.</p></div></div><div className="music-step"><span>02</span><div><strong>Lance un morceau</strong><p>Windows transmet les informations au dashboard.</p></div></div><div className="music-step"><span>03</span><div><strong>Garde les commandes à portée</strong><p>Lecture, pause, précédent et suivant. Les commandes proposées dépendent de la session ; le volume local se règle dans Spotify.</p></div></div><button className="button primary" disabled={!!busy} onClick={() => act('spotify-open','/spotify/open',{})}>Ouvrir Spotify<ArrowUpRight size={16}/></button><button className="text-link music-mode-link" onClick={() => navigate('settings')}>Utiliser Spotify Connect à la place<ArrowUpRight size={14}/></button></div></section></div>}
+
       {page === 'discord' && <DiscordPage desktop={desktop} notice={notice} suspended={!!modal || sidebar} />}
-      {page === 'social' && <SocialPage settings={settings} desktop={desktop} notice={notice} suspended={!!modal || sidebar} />}
+
+      {['images','suno'].includes(page)&&<CreatorPage key={page} kind={page==='images'?'chatgpt':'suno'} desktop={desktop} notice={notice} suspended={!!modal||sidebar}/>}
+
+      {page === 'social' && <SocialPage onSettings={setSettings} settings={settings} desktop={desktop} notice={notice} suspended={!!modal || sidebar} />}
+
       {page === 'domains' && <DomainsPage settings={settings} onSettings={setSettings} notice={notice} />}
+
       {page === 'vercel' && <VercelPage settings={settings} onSettings={setSettings} notice={notice} />}
+
       {page === 'settings' && <SettingsForm services={local} settings={settings} busy={busy} onSave={async values => { const result = await act('settings', '/settings', values, 'Paramètres enregistrés.'); if (result) setSettings(result); return !!result; }} onConnect={connectSpotify} onDisconnect={async () => { const result = await act('disconnect', '/spotify/disconnect', {}, 'Spotify déconnecté.'); if (result) setSettings(await api('/settings')); }} />}
+
       {page === 'activity' && <div className="activity-page">{logProject&&<div className="section-note">Journaux · {logProject}<button onClick={()=>setLogProject('')}>Tous les projets</button></div>}{Activities({ full: true })}<section className="card"><div className="card-heading"><h2><Terminal size={18} /> Opérations & journaux</h2></div>{state?.jobs?.length ? <div className="job-list">{state.jobs.filter(item=>!logProject||item.title.includes(logProject)).map(item => <button key={item.id} onClick={() => { setJob(null); setModal({ type: 'job', id: item.id }); }}><div className={`job-dot ${item.status}`}>{item.status === 'running' ? <LoaderCircle className="spin" size={17} /> : item.status === 'success' ? <Check size={17} /> : <X size={17} />}</div><span><strong>{item.title}</strong><small>{hour(item.started)} · {({ running: 'En cours', success: 'Terminé', error: 'Échec' })[item.status]}</small></span><ChevronRight size={17} /></button>)}</div> : <Empty icon={Terminal} title="Aucune opération" text="Les analyses, builds et démarrages apparaîtront ici." />}</section></div>}
+
       </>}
-      <footer className="page-footer"><span><Crown size={12} /> LeStitcheur Control <span className="footer-version">v2.7</span></span><span><i className={errors.state ? 'neutral-dot' : 'live-dot'} /> {errors.state ? 'Connexion interrompue' : desktop ? 'Application de bureau' : 'Exécution locale'}<span className="footer-dot">·</span> Fait pour tes sessions.</span></footer></main></div>
+
+      <footer className="page-footer"><span><Crown size={12} /> LeStitcheur Control <span className="footer-version">v2.9</span></span><span><i className={errors.state ? 'neutral-dot' : 'live-dot'} /> {errors.state ? 'Connexion interrompue' : desktop ? 'Application de bureau' : 'Exécution locale'}<span className="footer-dot">·</span> Fait pour tes sessions.</span></footer></main></div>
+
     <div className="toast-region" aria-live="polite">{toast && <div className={`toast ${toast.type}`}>{toast.type === 'error' ? <AlertCircle size={19} /> : toast.type === 'info' ? <CircleHelp size={19} /> : <CheckCheck size={19} />}<span>{toast.message}</span><IconButton icon={X} label="Fermer la notification" onClick={() => setToast(null)} /></div>}</div>
+
     {modal && <Modal title={modal.type === 'search' ? 'Aller à…' : modal.type === 'job' ? job?.title || 'Journal de l’opération' : modal.type === 'rename' ? 'Renommer le projet' : modal.type === 'delete' ? 'Déplacer dans la Corbeille' : modal.type === 'release' ? 'Publier une release GitHub' : modal.type === 'deploy' ? 'Push GitHub' : modal.type === 'analyze' ? 'Analyser le projet' : modal.type === 'test-deploy' ? 'Tester le déploiement' : modal.type === 'stop-fivem' ? 'Arrêter le processus FiveM' : modal.type === 'ptero-console' ? `Console · ${modal.server.name}` : modal.type === 'ptero-power' ? `${modal.signal === 'restart' ? 'Redémarrer' : 'Arrêter'} ${modal.server.name}` : `Commande · ${modal.server.name}`} close={() => setModal(null)} wide={modal.type === 'job'} consoleView={modal.type === 'ptero-console'}>
+
       {modal.type === 'search' ? <><div className="command-search"><Search size={19} /><input autoFocus aria-label="Rechercher une page ou un projet" placeholder="Un projet, un serveur, une page…" value={input} onChange={e => setInput(e.target.value)} /></div><div className="command-results">{[{label:'Lancer MySQL + FiveM',run:()=>startStack()},{label:'Ouvrir un terminal PowerShell',run:()=>openTerminal(null)},{label:'Notifications',run:()=>openWorkspace('notifications')},{label:'Calendrier de publications',run:()=>openWorkspace('creator')},...(workspace?.sessions||[]).map(s=>({label:'Session · '+s.name,run:async()=>{const result=await act('session','/workspace/sessions/'+s.id+'/run',{});if(result?.terminal)openTerminal(result.project);}})),...ptero.servers.map(server=>({label:'Console · '+server.name,run:()=>setModal({type:'ptero-console',server})}))].filter(item=>item.label.toLowerCase().includes(input.toLowerCase())).map(item=><button key={item.label} onClick={()=>{setModal(null);item.run();}}><Terminal size={18}/>{item.label}<ArrowRight size={15}/></button>)}{[...NAV, { id: 'settings', label: 'Paramètres', icon: Settings2 }, { id: 'activity', label: 'Activité', icon: Activity }].filter(item => item.label.toLowerCase().includes(input.toLowerCase())).map(item => <button key={item.id} onClick={() => { navigate(item.id); setModal(null); }}><item.icon size={18} />{item.label}<ArrowRight size={15} /></button>)}{projects.filter(p => p.name.toLowerCase().includes(input.toLowerCase())).map(project => <button key={project.name} onClick={() => { navigate('projects'); setProjectFilter('all'); setQuery(project.name); setModal(null); }}><FolderCode size={18} />{project.name}<small>Projet</small></button>)}</div></>
+
         : modal.type === 'ptero-console' ? <Suspense fallback={<div className="loading-state"><LoaderCircle className="spin" /> Chargement de la console…</div>}><PterodactylConsole key={modal.server.id} server={modal.server} /></Suspense>
+
         : modal.type === 'job' ? <div className="job-modal">{job ? <><div className="job-status"><Badge tone={job.status === 'success' ? 'green' : job.status === 'error' ? 'red' : 'amber'}>{({ running: 'En cours', success: 'Terminé', error: 'Échec' })[job.status]}</Badge><span>Démarré à {hour(job.started)}</span></div><pre className="log-output" aria-label="Journal de l’opération">{job.output || 'Préparation de l’opération…'}</pre></> : <div className="loading-state"><LoaderCircle className="spin" /> Chargement du journal…</div>}</div>
+
         : <form className="modal-body" onSubmit={async e => { e.preventDefault(); if (['rename','delete','deploy','release','analyze','test-deploy'].includes(modal.type)) await confirmProject(); else if (modal.type === 'stop-fivem') { if (await act('stop-fivem', '/services/fivem/stop', { confirm: true }, 'FiveM arrêté.')) setModal(null); } else if (modal.type === 'ptero-power') { if (await act('ptero-power', `/pterodactyl/${modal.server.id}/power`, { signal: modal.signal }, 'Commande envoyée.')) setModal(null); } }}>
+
           {modal.project && <div className="modal-project"><FolderCode size={22} /><div><strong>{modal.project.name}</strong><span>{modal.project.path}</span></div></div>}
+
           {modal.type === 'rename' && <label>Nouveau nom<input autoFocus value={input} onChange={e => setInput(e.target.value)} required maxLength={120} /></label>}
+
           {modal.type === 'delete' && <><p>Le dossier et son contenu seront déplacés dans la Corbeille Windows. Tu pourras les restaurer depuis celle-ci.</p><label>Recopie « {modal.project.name} » pour confirmer<input autoFocus value={input} onChange={e => setInput(e.target.value)} required autoComplete="off" /></label></>}
-          {modal.type === 'release' && <>{modal.error?<p className="inline-error">{modal.error}</p>:!modal.plan?<p>Vérification de la release…</p>:<><p>Publier {modal.plan.tag} sur {modal.plan.repository}. Les fichiers sont envoyés dans un brouillon, vérifiés puis rendus publics.</p><ul>{modal.plan.files.map(file=><li key={file.name}>{file.name} · {(file.size/1048576).toFixed(1)} Mo</li>)}</ul></>}</>}
+
+          {modal.type === 'release' && <><p>Une vérification réussie est obligatoire pour les fichiers actuels.</p><button type="button" className="button secondary" onClick={()=>act('preflight',`/projects/${encodeURIComponent(modal.project.name)}/action`,{action:'preflight'})}>Lancer les vérifications</button>{modal.error?<p className="inline-error">{modal.error}</p>:!modal.plan?<p>Vérification de la release…</p>:<><p>Publier {modal.plan.tag} sur {modal.plan.repository}. Les fichiers sont envoyés dans un brouillon, vérifiés puis rendus publics.</p><ul>{modal.plan.files.map(file=><li key={file.name}>{file.name} · {(file.size/1048576).toFixed(1)} Mo</li>)}</ul></>}</>}
+
           {modal.type === 'deploy' && <>{modal.error ? <p className="inline-error">{modal.error}</p> : !modal.plan ? <p className="muted">Vérification du dépôt…</p> : <><p>Publier le dernier commit sur GitHub. Cette opération peut déclencher les workflows configurés sur le dépôt.</p><dl className="deploy-details"><dt>Dépôt</dt><dd>{modal.plan.remote}</dd><dt>Branche</dt><dd>{modal.plan.branch}</dd><dt>Commit</dt><dd>{modal.plan.head.slice(0, 8)}</dd></dl></>}</>}
+
           {['analyze', 'test-deploy'].includes(modal.type) && <><p>{modal.type === 'analyze' ? 'Lancer les scripts lint et test disponibles dans ce projet.' : 'Lancer le script build du projet pour vérifier qu’il peut être construit localement.'}</p><div className="info-box"><Terminal size={18} /><span>Les scripts et leurs étapes pre/post définis par ce projet vont s’exécuter sur ton PC. {modal.type === 'test-deploy' && 'Le panel n’ajoute aucune commande de publication distante.'}</span></div></>}
+
           {modal.type === 'stop-fivem' && <p>Cette action ferme le processus FiveM et ses processus enfants. Pour un arrêt en douceur avec sauvegarde des joueurs, utilise l’arrêt depuis txAdmin.</p>}
+
           {modal.type === 'ptero-power' && <p>Les joueurs connectés seront déconnectés du serveur. Confirmer l’action ?</p>}
 
-          <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setModal(null)}>Annuler</button><button type="submit" className={`button ${modal.type === 'delete' || modal.type === 'stop-fivem' ? 'danger' : 'primary'}`} disabled={!!busy || (modal.type === 'delete' && input !== modal.project.name) || (['deploy','release'].includes(modal.type) && !modal.plan)}>{busy ? <LoaderCircle size={16} className="spin" /> : null}{({ rename: 'Renommer', delete: 'Mettre à la Corbeille', deploy: 'Push GitHub', release: 'Publier la release', analyze: 'Lancer l’analyse', 'test-deploy': 'Lancer le build', 'stop-fivem': 'Arrêter le processus', 'ptero-power': 'Confirmer' })[modal.type]}</button></div>
+
+
+          <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setModal(null)}>Annuler</button><button type="submit" className={`button ${modal.type === 'delete' || modal.type === 'stop-fivem' ? 'danger' : 'primary'}`} disabled={!!busy || (modal.type === 'delete' && input !== modal.project.name) || (['deploy','release'].includes(modal.type) && !modal.plan) || (modal.type === 'release' && !modal.plan?.verified)}>{busy ? <LoaderCircle size={16} className="spin" /> : null}{({ rename: 'Renommer', delete: 'Mettre à la Corbeille', deploy: 'Push GitHub', release: 'Publier la release', analyze: 'Lancer l’analyse', 'test-deploy': 'Lancer le build', 'stop-fivem': 'Arrêter le processus', 'ptero-power': 'Confirmer' })[modal.type]}</button></div>
+
         </form>}
+
     </Modal>}
+
   </div>;
+
 }
 
+
+
 function SettingsForm({ services, settings, busy, onSave, onConnect, onDisconnect }) {
+
   const [draft, setDraft] = useState(() => ({ ...settings, pteroKey: '', fivemArgs: JSON.stringify(settings.fivemArgs), mysqlArgs: JSON.stringify(settings.mysqlArgs) }));
+
   const [error, setError] = useState('');
+
   const [saved, setSaved] = useState(true);
+
   function update(key, value) { setDraft(prev => ({ ...prev, [key]: value })); setSaved(false); }
+
   const field = (label, key, help, type = 'text', placeholder = '') => <label>{label}<input type={type} value={draft[key] ?? ''} placeholder={placeholder} onChange={e => update(key, e.target.value)} autoComplete={type === 'password' ? 'new-password' : 'off'} />{help && <span className="field-help">{help}</span>}</label>;
+
   return <form className="settings-form" onSubmit={async e => { e.preventDefault(); setError(''); try { const values = { ...draft, fivemArgs: JSON.parse(draft.fivemArgs), mysqlArgs: JSON.parse(draft.mysqlArgs) }; if (await onSave(values)) { setDraft(prev => ({ ...prev, pteroKey: '' })); setSaved(true); } } catch { setError('Les arguments doivent être une liste JSON, par exemple : ["--console"].'); } }}>
+
     <p className="settings-persistence-note">Tes paramètres et clés sont conservés dans ton profil Windows, indépendamment des builds. Une sauvegarde est créée à chaque enregistrement et avant chaque mise à jour.</p><div className="settings-layout"><section className="card"><div className="card-heading"><h2><FolderCode size={18} /> Espace de travail</h2><Badge tone="green">Local</Badge></div><div className="settings-fields">{field('Dossier de tes projets', 'projectsRoot', 'Chaque sous-dossier direct apparaît dans Mes projets.')}<div className="info-box"><ShieldCheck size={18} /><span>Le panel est accessible uniquement depuis ce PC. Les secrets sont chiffrés avec ton compte Windows.</span></div></div></section>
+
     <section className="card"><div className="card-heading"><h2><Server size={18} /> Pterodactyl</h2><Badge tone={settings.pteroConfigured ? 'green' : 'neutral'}>{settings.pteroConfigured ? 'Configuré' : 'À connecter'}</Badge></div><div className="settings-fields">{field('Adresse de ton panel', 'pteroUrl', 'URL HTTP ou HTTPS de ton panel, avec le port si nécessaire, sans /api/client.', 'url', 'https://panel.exemple.fr')}{field('Clé API Client', 'pteroKey', settings.pteroKeySaved ? 'Clé enregistrée. Laisse vide pour la conserver.' : 'Dans Pterodactyl : ton compte → API Credentials. Utilise une clé Client.', 'password', settings.pteroKeySaved ? '•••••••••••••••• · enregistrée' : 'ptlc_…')}<p className="field-help">La clé reste sur ce PC et n’est jamais renvoyée au navigateur.</p></div></section>
+
     <section className="card local-settings"><div className="card-heading"><h2><Gamepad2 size={18} /> Serveur local</h2><span className="subtle-label">MYSQL → FIVEM</span></div><div className="settings-fields"><h3><Database size={16} /> MySQL / MariaDB</h3><label>Mode de démarrage<select value={draft.mysqlMode} onChange={e => update('mysqlMode', e.target.value)}><option value="laragon">Laragon (configuration existante)</option><option value="executable">Exécutable mysqld.exe</option><option value="service">Service Windows</option></select></label>{draft.mysqlMode === 'laragon' ? <>{field('Dossier Laragon', 'laragonRoot', 'Le dossier qui contient laragon.exe, bin et data.')}{field('Version MySQL (facultatif)', 'laragonVersion', 'Nom du dossier dans bin\\mysql. Laisse vide si une seule version est installée.')}<div className="info-box"><Database size={18} /><span>La version installée, le port et la base sont lus dans le my.ini de Laragon. Si MySQL fonctionne déjà, il est réutilisé.</span></div>{services?.laragon && <p className="field-help">Détecté : {services.laragon.version} · port {services.laragon.port}<br />Base : {services.laragon.dataDir}</p>}{services?.mysqlError && <p className="inline-error">{services.mysqlError}</p>}</> : draft.mysqlMode === 'service' ? field('Nom du service Windows', 'mysqlService', 'Ex. MySQL80 ou MariaDB. Windows demandera les droits administrateur.', 'text', 'MySQL80') : <>{field('Chemin de mysqld.exe', 'mysqlExe', 'Indique le chemin complet de ton installation MySQL ou MariaDB.', 'text', 'C:\\xampp\\mysql\\bin\\mysqld.exe')}{field('Arguments MySQL (liste JSON)', 'mysqlArgs', 'Exemple : ["--defaults-file=C:\\\\xampp\\\\mysql\\\\bin\\\\my.ini", "--standalone"]')}</>}{draft.mysqlMode !== 'laragon' && field('Port MySQL', 'mysqlPort', 'Le lancement de FiveM attend une réponse MySQL sur ce port.', 'number')}<div className="form-divider" /><h3><Gamepad2 size={16} /> FiveM / txAdmin</h3>{field('Exécutable FiveM', 'fivemExe')}{field('Dossier de travail', 'fivemCwd')}{field('Arguments FiveM (liste JSON)', 'fivemArgs', 'Le profil txAdmin existant est utilisé par défaut.')}<div className="form-columns">{field('Port FiveM', 'fivemPort', '', 'number')}{field('Port txAdmin', 'txAdminPort', '', 'number')}</div></div></section>
+
     <section className="card spotify-settings"><div className="card-heading"><h2><SpotifyMark /> Spotify</h2><Badge tone={settings.spotifyConnected ? 'green' : 'neutral'}>{settings.spotifyConnected ? 'Connecté' : 'À connecter'}</Badge></div><div className="settings-fields"><label>Mode Spotify<select value={draft.spotifyMode || 'desktop'} onChange={e => update('spotifyMode', e.target.value)}><option value="desktop">Application Windows · sans clé API</option><option value="api">Spotify Connect · API Web</option></select></label><p>{draft.spotifyMode === 'desktop' ? 'L’application Spotify de ce PC est pilotée via Windows. Les paramètres API ci-dessous sont facultatifs.' : 'Pilote ton appareil Spotify actif avec ton compte Premium.'}</p>{field('Client ID Spotify', 'spotifyClientId', 'Depuis une application créée dans le Spotify Developer Dashboard. Aucun Client Secret nécessaire.')}<label>Redirect URI à ajouter dans Spotify<input readOnly value={`${location.origin}/auth/spotify/callback`} onFocus={e => e.currentTarget.select()} /></label><a className="text-link" href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">Ouvrir Spotify Developer Dashboard <ArrowUpRight size={15} /></a><div className="info-box"><Link2 size={18} /><span>Enregistre tes paramètres, puis connecte ton compte. En mode développement Spotify, le compte doit avoir accès à ton application.</span></div><button type="button" className="button spotify-connect" disabled={!!busy || !saved || !settings.spotifyClientId} onClick={onConnect}><SpotifyMark size={16} /> {settings.spotifyConnected ? 'Reconnecter Spotify' : 'Connecter mon compte'}</button>{settings.spotifyConnected && <button type="button" className="text-link muted" disabled={!!busy} onClick={onDisconnect}>Déconnecter ce compte</button>}</div></section></div>
+
     {error && <p className="inline-error" role="alert">{error}</p>}<div className="settings-save"><span><ShieldCheck size={15} /> {saved ? 'Paramètres enregistrés sur ce PC' : 'Modifications non enregistrées'}</span><button type="submit" className="button primary" disabled={!!busy}>{busy === 'settings' ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />} Enregistrer les paramètres</button></div>
+
   </form>;
+
 }
+
+
 

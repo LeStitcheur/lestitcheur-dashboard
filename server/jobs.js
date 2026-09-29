@@ -5,7 +5,7 @@ export function createJobs(onActivity = () => {}) {
   const jobs = [];
   const activities = [];
   const active = new Map();
-  const addActivity = (message, type = 'info', details) => { const entry = { id: randomUUID(), time: new Date().toISOString(), message, type, details }; activities.unshift(entry); activities.splice(100); Promise.resolve(onActivity(entry)).catch(error=>console.error('Journal persistant :',error.message)); };
+  const addActivity = (message, type = 'info', details) => { const entry = { id: randomUUID(), time: new Date().toISOString(), message, type, details:details||{source:/GitHub|Git ·|publication/i.test(message)?'github':/DNS/.test(message)?'domains':'activity'} }; activities.unshift(entry); activities.splice(100); Promise.resolve(onActivity(entry)).catch(error=>console.error('Journal persistant :',error.message)); };
   function create(title, task, lock) {
     if (lock && active.has(lock)) throw new Error('Une opération est déjà en cours sur ce projet.');
     if (jobs.filter(j => j.status === 'running').length >= 4) throw new Error('Quatre opérations sont déjà en cours.');

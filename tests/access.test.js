@@ -9,3 +9,12 @@ test('locked dashboard API does not disclose settings or accept project actions'
  const status=await fetch('http://127.0.0.1:4329/api/access/status').then(r=>r.json());assert.equal(status.authorized,false);assert.equal(status.settings,undefined);for(const route of ['bootstrap','settings','projects','state']){const response=await fetch('http://127.0.0.1:4329/api/'+route,{headers:{'X-Panel-Token':status.token}});assert.equal(response.status,401);}
  const response=await fetch('http://127.0.0.1:4329/api/projects/example/action',{method:'POST',headers:{'Content-Type':'application/json','X-Panel-Token':status.token},body:JSON.stringify({action:'release'})});assert.equal(response.status,401);
 });
+
+test('logout prevents an in-flight OAuth callback from reviving the persisted session',async t=>{
+ const f=await fixture(t);let release,started;const ready=new Promise(r=>started=r);
+ f.options.fetcher=async url=>{if(url.endsWith('/token'))return {ok:true,json:async()=>({access_token:'a',refresh_token:'r',expires_in:120})};started();await new Promise(r=>release=r);return {ok:true,json:async()=>({id:DISCORD_OWNER,username:'test'})};};
+ const access=await createAccess(f.options);const url=new URL(access.begin().url);
+ const callback=access.callback({state:url.searchParams.get('state'),code:'test'});const rejected=assert.rejects(callback,/annul/);
+ await ready;await access.logout();release();await rejected;assert.equal(access.allowed(),false);
+ const restored=await createAccess(f.options);assert.equal(await restored.ensure(),false);
+});

@@ -11,6 +11,8 @@ app.whenReady().then(async()=>{
  if(!diagnostic?.hostVisible||!diagnostic?.controlVisible||!diagnostic?.managedVisible)throw Error('Native surface hidden: '+JSON.stringify(diagnostic));
  const probe=async()=>{diagnostic=null;child.stdin.write(JSON.stringify({type:'probe'})+'\n');const deadline=Date.now()+3000;while(!diagnostic){if(Date.now()>deadline)throw Error('Probe timed out');await new Promise(r=>setTimeout(r,25));}return diagnostic;};
  if(!diagnostic.ownedPopup)throw Error('RDP must be composed independently of Chromium');
+ child.stdin.write(JSON.stringify({type:'fullscreen',enabled:true})+'\n');await new Promise(r=>setTimeout(r,250));const full=await probe();if(!full.fullscreen||!full.exitButtonVisible||!full.hostVisible)throw Error('Fullscreen surface or escape button missing');
+ child.stdin.write(JSON.stringify({type:'fullscreen',enabled:false})+'\n');await new Promise(r=>setTimeout(r,250));const restored=await probe();if(restored.fullscreen||restored.exitButtonVisible||restored.width!==900||restored.height!==600)throw Error('Fullscreen did not restore preview bounds');
  const first=diagnostic;const [oldX,oldY]=win.getPosition();win.setPosition(oldX+100,oldY+60);await new Promise(r=>setTimeout(r,250));const moved=await probe();if(moved.x-first.x!==100||moved.y-first.y!==60)throw Error('Surface did not follow owner: '+JSON.stringify({first,moved}));
  win.hide();await new Promise(r=>setTimeout(r,250));if((await probe()).hostVisible)throw Error('Surface visible while owner is hidden');
  win.showInactive();await new Promise(r=>setTimeout(r,250));if(!(await probe()).hostVisible)throw Error('Surface did not restore with owner');

@@ -11,7 +11,7 @@ export function protectSocialContents(contents, load, account) {
       const { hostname } = new URL(details.url);
       callback({ cancel: /^(?:localhost$|127\.|0\.0\.0\.0$|\[?::1\]?$)/i.test(hostname) });
     });
-    const hosts = account?.platform === 'discord' ? ['discord.com'] : ['tiktok.com','instagram.com','facebook.com','accounts.google.com'];
+    const hosts = account?.platform === 'discord' ? ['discord.com'] : ['tiktok.com','instagram.com','facebook.com','accounts.google.com','youtube.com','x.com','chatgpt.com','openai.com','suno.com','appleid.apple.com'];
     const allowed = value => { try { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password && hosts.some(host => u.hostname === host || u.hostname.endsWith('.' + host)); } catch { return false; } };
     const navigate = (event, value) => { if (!allowed(value)) { event.preventDefault(); const link = externalUrl(value); if (link) void shell.openExternal(link).catch(()=>{}); } };
     contents.on('will-navigate', navigate);
@@ -25,8 +25,9 @@ export function createSocialWindows() {
   const load = (window, url) => window.loadURL(url).catch(error => {
     if (error.code !== 'ERR_ABORTED' && !window.isDestroyed()) void dialog.showMessageBox(window, { type: 'info', title: 'Connexion au réseau', message: 'Ce réseau n’a pas pu être chargé.', detail: 'Actualise la page ou utilise « Ouvrir dans le navigateur » dans le menu Navigation.', buttons: ['Fermer'] });
   });
-  function open(account, target) {
+  function open(account, target, external = false) {
     const url = socialUrl(account, target);
+    if (external) return shell.openExternal(url);
     let window = windows.get(account.id);
     if (window && !window.isDestroyed()) { void load(window,url); if (window.isMinimized()) window.restore(); window.show(); window.focus(); return; }
     const title = `${account.platform === 'tiktok' ? 'TikTok' : 'Instagram'} · @${account.handle}`;

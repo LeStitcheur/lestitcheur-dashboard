@@ -26,6 +26,8 @@ sealed class RdpHost : Form {
     [DllImport("user32.dll")] static extern IntPtr GetWindowDpiAwarenessContext(IntPtr window);
     [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     readonly RdpControl control = new RdpControl();
+    readonly Button exitFullscreen = new Button();
+    bool fullscreen;
     readonly JavaScriptSerializer json = new JavaScriptSerializer();
     readonly IntPtr parent;
     readonly uint parentPid;
@@ -44,6 +46,10 @@ sealed class RdpHost : Form {
         FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;AutoScaleMode=AutoScaleMode.None;
         StartPosition=FormStartPosition.Manual;Location=new Point(-20000,-20000);Size=new Size(900,600);BackColor=Color.FromArgb(11,18,27);
         control.Dock=DockStyle.Fill;Controls.Add(control);
+        exitFullscreen.Text="Quitter le plein écran";exitFullscreen.AccessibleName="Quitter le plein écran";
+        exitFullscreen.Size=new Size(190,38);exitFullscreen.FlatStyle=FlatStyle.Flat;
+        exitFullscreen.BackColor=Color.FromArgb(25,35,48);exitFullscreen.ForeColor=Color.White;
+        exitFullscreen.Visible=false;exitFullscreen.Click+=delegate{SetFullscreen(false);};Controls.Add(exitFullscreen);
         timer.Interval=40;timer.Tick+=delegate {
             uint owner;GetWindowThreadProcessId(parent,out owner);
             if(!IsWindow(parent)||owner!=parentPid){Close();return;}
@@ -87,10 +93,14 @@ sealed class RdpHost : Form {
         if(!show){if(Visible)Hide();return;}
         Point origin=new Point(surfaceX,surfaceY);
         if(!ClientToScreen(parent,ref origin))return;
-        bool changed=Left!=origin.X||Top!=origin.Y||Width!=surfaceWidth||Height!=surfaceHeight;
-        if(changed)SetWindowPos(Handle,IntPtr.Zero,origin.X,origin.Y,surfaceWidth,surfaceHeight,0x0010|0x0004);
+        Rectangle bounds=fullscreen?Screen.FromHandle(parent).Bounds:new Rectangle(origin.X,origin.Y,surfaceWidth,surfaceHeight);
+        bool changed=Left!=bounds.X||Top!=bounds.Y||Width!=bounds.Width||Height!=bounds.Height;
+        if(changed)SetWindowPos(Handle,IntPtr.Zero,bounds.X,bounds.Y,bounds.Width,bounds.Height,0x0010|0x0004);
+        exitFullscreen.Visible=fullscreen;
+        if(fullscreen){exitFullscreen.Location=new Point(Math.Max(0,(ClientSize.Width-exitFullscreen.Width)/2),12);exitFullscreen.BringToFront();}
         if(!Visible){Visible=true;control.Visible=true;}
     }
+    void SetFullscreen(bool enabled) {fullscreen=enabled;SyncSurface();}
     void ReadInput() {
         try {string line;while((line=Console.ReadLine())!=null){if(line.Length>20000)continue;var data=json.Deserialize<Dictionary<string,object>>(line);BeginInvoke(new Action(()=>HandleMessage(data)));}}catch { }
         try{BeginInvoke(new Action(Close));}catch { }
@@ -116,9 +126,10 @@ sealed class RdpHost : Form {
                     wantsVisible=d.ContainsKey("visible")&&(bool)d["visible"];
                     SyncSurface();
                     break;
+                case "fullscreen": SetFullscreen(d.ContainsKey("enabled")?(bool)d["enabled"]:!fullscreen);break;
                 case "focus": control.Focus();break;
                 case "disconnect": Close();break;
-                case "probe": Send(new {phase="diagnostic",embedded=GetParent(Handle)==parent,ownedPopup=(GetWindowLongPtr(Handle,-16).ToInt64()&0x40000000L)==0,hostVisible=IsWindowVisible(Handle),controlVisible=IsWindowVisible(control.Handle),managedVisible=Visible,x=Left,y=Top,width=ClientSize.Width,height=ClientSize.Height,controlWidth=control.Width,controlHeight=control.Height});break;
+                case "probe": Send(new {phase="diagnostic",embedded=GetParent(Handle)==parent,fullscreen=fullscreen,exitButtonVisible=exitFullscreen.Visible,ownedPopup=(GetWindowLongPtr(Handle,-16).ToInt64()&0x40000000L)==0,hostVisible=IsWindowVisible(Handle),controlVisible=IsWindowVisible(control.Handle),managedVisible=Visible,x=Left,y=Top,width=ClientSize.Width,height=ClientSize.Height,controlWidth=control.Width,controlHeight=control.Height});break;
             }
         } catch(Exception ex){d.Remove("password");Send(new {phase="error",message="La connexion RDP a échoué. Vérifie les paramètres et l’accès au serveur.",code=ex.HResult});}
     }

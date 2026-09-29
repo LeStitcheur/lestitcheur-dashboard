@@ -22,6 +22,7 @@ export function workspaceRoutes(app,{workspace,settings,services,projects,jobs,p
   app.post('/api/workspace/:kind/remove',async(req,res)=>{await workspace.remove(req.params.kind,req.body.id);res.json({success:true});});
   app.post('/api/workspace/sessions/:id/run',async(req,res)=>{
     const mode=workspace.get().sessions.find(s=>s.id===req.params.id);if(!mode)throw Error('Session introuvable.');
+    if(mode.editor&&!mode.project)throw Error('Choisis un projet pour ouvrir VS Code dans cette session.');
     const result=jobs.create('Session · '+mode.name,async log=>{
       if(mode.stack){log('Démarrage MySQL puis FiveM…\n');const start=services.start('stack');if(start.jobId){while(jobs.find(start.jobId)?.status==='running')await new Promise(r=>setTimeout(r,500));if(jobs.find(start.jobId)?.status==='error')throw Error('Démarrage des services échoué. Consulte leur journal.');}}
       if(mode.editor&&mode.project){log('Ouverture du projet…\n');await projects.action(mode.project,'vscode',{});}

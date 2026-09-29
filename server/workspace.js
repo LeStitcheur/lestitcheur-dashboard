@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 const derive = promisify(scrypt);
 const text = (value, max = 200) => { if (typeof value !== 'string' || value.length > max || /[\x00-\x08]/.test(value)) throw Error('Texte invalide.'); return value.trim(); };
 export const WIDGETS = ['codex', 'launchers', 'stats', 'servers', 'music', 'projects', 'activity', 'terminal'];
-const defaults = () => ({ widgets: WIDGETS, favorites: [], quiet: false, notifications: [], incidents: [], health: {}, posts: [], sessions: [{id:'development',name:'Développement',project:'',stack:false,editor:false,music:false,terminal:true}], commands: [], monitors: [] });
+const defaults = () => ({ samples:{},thresholds:{cpu:90,memory:90,disk:90},alarms:{},domainHealth:[],externalSeen:[],integrationErrors:{},widgets: WIDGETS, favorites: [], quiet: false, notifications: [], incidents: [], health: {}, posts: [], sessions: [{id:'development',name:'Développement',project:'',stack:false,editor:false,music:false,terminal:true}], commands: [], monitors: [] });
 
 // All changes are serialized and persisted before becoming visible to readers.
 export async function createWorkspace(directory) {
@@ -25,8 +25,14 @@ export async function createWorkspace(directory) {
     get:()=>structuredClone(state),
     flush:()=>queue,
     notify:entry=>change(s=>notify(s,entry)),
+    readOne:id=>change(s=>{const item=s.notifications.find(n=>n.id===id);if(item)item.read=true;}),
+    integrationError:(key,error)=>change(s=>{s.integrationErrors[key]=error;}),
+    externalNotifications:items=>change(s=>{delete s.integrationErrors.github;for(const item of items){if(s.externalSeen.includes(item.key))continue;s.externalSeen.push(item.key);notify(s,item);}s.externalSeen=s.externalSeen.slice(-1000);}),
+    samples:items=>change(s=>{const time=new Date().toISOString();for(const item of items){s.samples[item.id]=[...(s.samples[item.id]||[]),{...item,time}].slice(-1440);for(const metric of ['cpu','memory','disk']){if(!Number.isFinite(item[metric]))continue;const key=item.id+':'+metric,exceeded=item[metric]>=s.thresholds[metric];if(exceeded&&!s.alarms[key])notify(s,{source:'monitor',type:'error',message:item.name+' · '+metric+' à '+item[metric].toFixed(0)+' % (seuil '+s.thresholds[metric]+' %)'});if(!exceeded&&s.alarms[key])notify(s,{source:'monitor',type:'success',message:item.name+' · '+metric+' revenu sous le seuil'});s.alarms[key]=exceeded;}}}),
+    domainHealth:items=>change(s=>{s.domainHealth=items;for(const item of items){for(const [kind,expires] of [['domaine',item.expiresAt],['certificat',item.certificate.expiresAt]]){if(!expires)continue;const days=Math.ceil((new Date(expires)-Date.now())/86400000),key=item.domain+':'+kind,warning=days<=30;if(warning&&!s.alarms[key])notify(s,{source:'domains',type:'error',message:item.domain+' · '+kind+' expire dans '+days+' jours'});s.alarms[key]=warning;}const key=item.domain+':tls-invalid';if(!item.certificate.valid&&!s.alarms[key])notify(s,{source:'domains',type:'error',message:item.domain+' · '+item.certificate.error});s.alarms[key]=!item.certificate.valid;}}),
     readAll:()=>change(s=>{s.notifications.forEach(n=>n.read=true);}),
     async preferences(input) { return change(s=>{
+      if(input.thresholds){for(const key of ['cpu','memory','disk']){const n=Number(input.thresholds[key]);if(!Number.isFinite(n)||n<1||n>100)throw Error('Seuil entre 1 et 100 requis.');s.thresholds[key]=n;}}
       if(input.quiet!==undefined)s.quiet=input.quiet===true;
       if(input.widgets!==undefined){if(!Array.isArray(input.widgets)||input.widgets.length>WIDGETS.length||new Set(input.widgets).size!==input.widgets.length||input.widgets.some(v=>!WIDGETS.includes(v)))throw Error('Widgets invalides.');s.widgets=input.widgets;}
       if(input.favorite!==undefined){const name=text(input.favorite);s.favorites=s.favorites.includes(name)?s.favorites.filter(v=>v!==name):[...s.favorites,name].slice(-100);}

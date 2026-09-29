@@ -46,7 +46,7 @@ export async function createRemoteDesktop({directory,window,helper,scale=()=>1,s
       child.on('exit',()=>{password='';if(active===current){phase=phase==='error'?'error':'disconnected';message=message||'Session RDP terminée.';publish();}});
       publish();return status();
     },
-    fullscreen(){if(!alive())return;window.setFullScreen(!window.isFullScreen());},
+    fullscreen(){if(!alive()||!active)return;send({type:'fullscreen'});},
     focus(){send({type:'focus'});},
   };
 }

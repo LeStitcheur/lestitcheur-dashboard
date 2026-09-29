@@ -1,3 +1,4 @@
+import {snapshot,gitDetails,gitMutation} from './git-worktree.js';
 import {releasePlan,githubCredential,githubClient,publishRelease} from './github-release.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -24,7 +25,9 @@ export async function deployPlan(cwd) {
 }
 export function createProjects(settings, jobs, appRoot) {
   const resolve = (name, mutation = false) => projectPath(settings.get().projectsRoot, name, appRoot, mutation);
+  const checks=new Map();
   return {
+    async gitDetails(name){return gitDetails(await resolve(name));},
     async list() {
       const root = settings.get().projectsRoot;
       const dirs = await fs.readdir(root, { withFileTypes: true });
@@ -54,11 +57,18 @@ export function createProjects(settings, jobs, appRoot) {
       return result.sort((a, b) => a.name.localeCompare(b.name));
     },
     async plan(name) { return deployPlan(await resolve(name)); },
-    async releasePlan(name) { const cwd=await resolve(name);return releasePlan(cwd,await deployPlan(cwd)); },
+    async releasePlan(name) { const cwd=await resolve(name);const plan=await releasePlan(cwd,await deployPlan(cwd));return {...plan,verified:checks.get(cwd)===plan.fingerprint}; },
     async action(name, action, data) {
       const cwd = await resolve(name, ['rename', 'delete'].includes(action));
       const lock = cwd.toLowerCase();
       if (jobs.active(lock)) throw new Error('Attends la fin de l’opération en cours sur ce dossier.');
+      if(action==='git'){return jobs.create('Git · '+name,async log=>{await gitMutation(cwd,data);log('Opération Git terminée.\n');},lock);}
+      if(action==='preflight')return jobs.create('Vérification avant publication · '+name,async log=>{
+        checks.delete(cwd);const original=await deployPlan(cwd),scan=await snapshot(cwd);log('Dépôt propre et version de travail contrôlés.\n');if(scan.findings.length)throw Error(scan.findings.map(f=>f.file+' : '+f.kind).join('\n'));
+        log('Recherche de clés et fichiers sensibles terminée (contrôle heuristique).\n');const pkg=await packageInfo(cwd);if(!pkg?.scripts?.test||/no test specified/.test(pkg.scripts.test))throw Error('Un script test réel est requis.');const runtime=findNodeRuntime();
+        await jobs.command(runtime.node,[runtime.npm,'run','test'],cwd,log,{env:runtime.env});if(pkg.scripts.build)await jobs.command(runtime.node,[runtime.npm,'run','build'],cwd,log,{env:runtime.env});
+        const after=await deployPlan(cwd);if(after.head!==original.head||(await snapshot(cwd)).fingerprint!==scan.fingerprint)throw Error('Le code a changé pendant les vérifications.');const plan=await releasePlan(cwd,after);checks.set(cwd,plan.fingerprint);log('Version, tests et empreintes des fichiers de release validés. Tu peux préparer la publication.\n');
+      },lock);
       if (action === 'terminal') { await terminal(cwd); jobs.addActivity(`Terminal ouvert · ${name}`); return {}; }
       if (action === 'vscode') { await editor(cwd); jobs.addActivity(`VS Code ouvert · ${name}`); return {}; }
       if (action === 'rename') {
@@ -74,6 +84,7 @@ export function createProjects(settings, jobs, appRoot) {
       }
       if(action==='release'){
         const plan=await releasePlan(cwd,await deployPlan(cwd));
+        if(checks.get(cwd)!==plan.fingerprint)throw Error('Lance la vérification avant publication pour cette version et ces fichiers.');
         if(data.fingerprint!==plan.fingerprint)throw Error('Le projet ou les fichiers ont changé. Vérifie à nouveau la release.');
         return jobs.create('Release GitHub · '+name,async log=>{
           const current=await releasePlan(cwd,await deployPlan(cwd));
