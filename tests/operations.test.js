@@ -25,6 +25,14 @@ test('Git add and version commit remain separate and preserve unstaged edits',as
 });
 
 test('version commit checks staged secrets even when the working copy is clean',async t=>{
- const cwd=await fixture(t);await gitRun(cwd,['init']);await fs.writeFile(path.join(cwd,'key.txt'),'-----BEGIN PRIVATE KEY-----');await gitRun(cwd,['add','.']);await fs.writeFile(path.join(cwd,'key.txt'),'safe');
+ const cwd=await fixture(t);await gitRun(cwd,['init']);await fs.writeFile(path.join(cwd,'key.txt'),['-----BEGIN', 'PRIVATE KEY-----'].join(' '));await gitRun(cwd,['add','.']);await fs.writeFile(path.join(cwd,'key.txt'),'safe');
  await assert.rejects(gitMutation(cwd,{operation:'commit-version',version:'1.0.0',fingerprint:(await snapshot(cwd)).fingerprint}),/sensible/);
+});
+
+
+test('security test fixtures do not look like embedded private keys in source',async()=>{
+ const source=await fs.readFile(new URL('./operations.test.js',import.meta.url),'utf8');
+ assert.deepEqual(secretFindings('tests/operations.test.js',source),[]);
+ const marker=['-----BEGIN','PRIVATE KEY-----'].join(' ');
+ assert.ok(secretFindings('key.txt',marker).includes('Clé privée'));
 });
