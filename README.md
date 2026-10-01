@@ -6,7 +6,7 @@
 
 **Tes serveurs, tes projets et tes communautés. Un seul endroit pour tout retrouver.**
 
-![Version](https://img.shields.io/badge/version-2.9.0-ff405c?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.9.1-ff405c?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-171b24?style=flat-square&logo=windows)
 ![Electron](https://img.shields.io/badge/Electron-171b24?style=flat-square&logo=electron)
 ![React](https://img.shields.io/badge/React-171b24?style=flat-square&logo=react)
@@ -48,6 +48,8 @@ La vue d’ensemble réunit l’état du PC, les serveurs et les raccourcis util
 Le dashboard liste les dossiers de ton répertoire de développement. Pour chaque projet, tu peux ouvrir VS Code ou un terminal à sa racine, le renommer, l’envoyer à la Corbeille, lancer ses scripts et consulter les journaux.
 
 La section **GitHub** permet de parcourir les dépôts, issues, pull requests, workflows et releases. Pour les dépôts locaux, tu retrouves aussi les différences Git, les commits, les branches et le pull en avance rapide.
+
+Deux boutons permettent de préparer une mise à jour : **Git add .** ajoute les modifications du projet à l’index, puis **Commit MAJ <version>** crée un commit avec ce message. La version est préremplie depuis `package.json` et reste modifiable. Le commit ne prend que les fichiers déjà ajoutés ; il ne déclenche aucun push.
 
 Les boutons **Push GitHub** et **Publier une release** sont accessibles depuis les projets configurés. La publication d’une release passe par une vérification du dépôt, des tests, du build et des fichiers à transmettre. Les actions de publication restent explicites : construire l’application ne publie rien sur GitHub.
 
