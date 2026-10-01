@@ -6,7 +6,7 @@
 
 **Tes serveurs, tes projets et tes communautés. Un seul endroit pour tout retrouver.**
 
-![Version](https://img.shields.io/badge/version-2.9.1-ff405c?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.9.2-ff405c?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-171b24?style=flat-square&logo=windows)
 ![Electron](https://img.shields.io/badge/Electron-171b24?style=flat-square&logo=electron)
 ![React](https://img.shields.io/badge/React-171b24?style=flat-square&logo=react)
@@ -169,6 +169,8 @@ Renseigne le Client ID, enregistre les paramètres et connecte le compte. Aucun 
 </details>
 
 ## 💾 Tes données restent sur ton PC
+
+Si le fichier `workspace.json` est endommagé, le dashboard tente de récupérer sa sauvegarde. Sinon, il conserve le fichier original sous un nom `workspace.json.damaged-…` et recrée l’espace personnel. Les paramètres de connexion restent dans leur fichier séparé.
 
 Les paramètres sont enregistrés dans **`%APPDATA%\LeStitcheur Control`**, en dehors de l’installation. Les secrets pris en charge sont chiffrés par Windows pour le compte utilisateur courant. Copier ces fichiers vers un autre compte Windows ne rend pas les secrets utilisables.
 

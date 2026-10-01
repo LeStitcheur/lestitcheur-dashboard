@@ -8,16 +8,54 @@ const text = (value, max = 200) => { if (typeof value !== 'string' || value.leng
 export const WIDGETS = ['codex', 'launchers', 'stats', 'servers', 'music', 'projects', 'activity', 'terminal'];
 const defaults = () => ({ samples:{},thresholds:{cpu:90,memory:90,disk:90},alarms:{},domainHealth:[],externalSeen:[],integrationErrors:{},widgets: WIDGETS, favorites: [], quiet: false, notifications: [], incidents: [], health: {}, posts: [], sessions: [{id:'development',name:'Développement',project:'',stack:false,editor:false,music:false,terminal:true}], commands: [], monitors: [] });
 
+function readWorkspace(buffer) {
+  let data = buffer;
+  let encoding = 'utf8';
+  if (buffer[0] === 0xff && buffer[1] === 0xfe) { data = buffer.subarray(2); encoding = 'utf16le'; }
+  else if (buffer[0] === 0xfe && buffer[1] === 0xff) { data = Buffer.from(buffer.subarray(2)); data.swap16(); encoding = 'utf16le'; }
+  const saved = JSON.parse(data.toString(encoding).replace(/^\uFEFF/, ''));
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) throw Error('Format workspace invalide.');
+  const state = defaults();
+  for (const key of Object.keys(state)) {
+    if (!(key in saved)) continue;
+    const value = saved[key], expected = state[key];
+    if (Array.isArray(expected) ? !Array.isArray(value) : typeof expected === 'object' ? !value || typeof value !== 'object' || Array.isArray(value) : typeof value !== typeof expected) throw Error('Champ workspace invalide : '+key);
+    state[key] = value;
+  }
+  if (state.widgets.some(v=>!WIDGETS.includes(v)) || state.favorites.some(v=>typeof v!=='string')) throw Error('Préférences workspace invalides.');
+  for (const key of ['notifications','incidents','posts','sessions','commands','monitors','domainHealth']) if(state[key].some(v=>!v||typeof v!=='object'||Array.isArray(v))) throw Error('Collection workspace invalide.');
+  for (const key of ['cpu','memory','disk']) if(state.thresholds[key]!==undefined&&(!Number.isFinite(state.thresholds[key])||state.thresholds[key]<1||state.thresholds[key]>100)) throw Error('Seuil workspace invalide.');
+  state.thresholds={...defaults().thresholds,...state.thresholds};
+  if(Object.values(state.samples).some(v=>!Array.isArray(v))) throw Error('Relevés workspace invalides.');
+  return state;
+}
+
 // All changes are serialized and persisted before becoming visible to readers.
 export async function createWorkspace(directory) {
   await fs.mkdir(directory, { recursive: true });
   const file = path.join(directory, 'workspace.json');
-  let state;
-  try { state = {...defaults(), ...JSON.parse(await fs.readFile(file, 'utf8'))}; }
-  catch (error) { if(error.code !== 'ENOENT') throw Error('Le fichier workspace.json est illisible.'); state = defaults(); }
+  let state, original, recovery = '';
+  try { original = await fs.readFile(file); state = readWorkspace(original); }
+  catch (error) {
+    // Permission and disk errors require intervention, not a silent reset.
+    if (error.code && error.code !== 'ENOENT') throw Error('Impossible de lire workspace.json ('+error.code+'). Vérifie les droits du dossier '+directory+'.');
+    for (const suffix of ['.bak', '.tmp']) {
+      try { state = readWorkspace(await fs.readFile(file+suffix)); recovery = 'restored'; break; }
+      catch (backupError) { if(backupError.code&&backupError.code!=='ENOENT') throw backupError; }
+    }
+    state ||= defaults();
+    if (original) {
+      const damaged = file+'.damaged-'+Date.now()+'-'+randomUUID();
+      await fs.writeFile(damaged, original, {mode:0o600,flag:'wx'});
+      recovery ||= 'reset';
+    }
+    if(recovery)state.notifications.unshift({id:randomUUID(),time:new Date().toISOString(),read:false,source:'activity',type:'info',message:recovery==='restored'?'Ton espace a été récupéré depuis sa sauvegarde.':'Le fichier de ton espace était endommagé. Un nouvel espace a été créé ; le fichier original est conservé dans le profil Windows.'});
+    await fs.writeFile(file+'.tmp', JSON.stringify(state), {mode:0o600});
+    await fs.rename(file+'.tmp',file);
+  }
   let queue = Promise.resolve();
   const change = fn => {
-    const work = queue.catch(()=>{}).then(async()=>{ const next=structuredClone(state); const result=fn(next); await fs.writeFile(file+'.tmp', JSON.stringify(next), {mode:0o600}); await fs.rename(file+'.tmp',file); state=next; return result; });
+    const work = queue.catch(()=>{}).then(async()=>{ const next=structuredClone(state); const result=fn(next); await fs.writeFile(file+'.bak', JSON.stringify(state), {mode:0o600}); await fs.writeFile(file+'.tmp', JSON.stringify(next), {mode:0o600}); await fs.rename(file+'.tmp',file); state=next; return result; });
     queue=work;return work;
   };
   const notify = (s, entry) => { s.notifications.unshift({id:randomUUID(),time:new Date().toISOString(),read:false,...entry});s.notifications=s.notifications.slice(0,500); };

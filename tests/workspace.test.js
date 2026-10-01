@@ -38,3 +38,21 @@ test('terminal pool isolates input, keeps both sessions and respects cancellatio
  const pool=createTerminalPool({settings:()=>({projectsRoot:process.cwd()}),appRoot:process.cwd(),locate:async()=>'pwsh',confirm:async()=>allow,emit:e=>events.push(e),spawn:()=>{const p={writes:[],onData:fn=>p.data=fn,onExit:fn=>p.exit=fn,write:d=>p.writes.push(d),kill:()=>p.killed=true,resize:()=>{},pause:()=>{},resume:()=>{}};engines.push(p);return p;}});
  const a=await pool.open({slot:'main'}),b=await pool.open({slot:'second'});pool.write(a.id,'one');pool.write(b.id,'two');assert.deepEqual(engines[0].writes,['one']);assert.deepEqual(engines[1].writes,['two']);engines[1].data('output');assert.equal(pool.snapshot('second').output,'output');assert.equal(pool.snapshot().output,'');assert.equal(await pool.remove('main'),false);assert.equal(pool.running(),true);allow=true;assert.equal(await pool.remove('main'),true);assert.equal(engines[0].killed,true);assert.equal(pool.list().length,1);pool.close();assert.equal(engines[1].killed,true);
 });
+
+async function recoveryFixture(t){const parent=path.resolve('.local/test-fixtures');await fs.mkdir(parent,{recursive:true});const directory=await fs.mkdtemp(path.join(parent,'workspace-recovery-'));t.after(()=>fs.rm(directory,{recursive:true,force:true}));return directory;}
+
+test('workspace accepts Windows UTF-8 and UTF-16 BOM files without losing preferences',async t=>{
+ for(const encoding of ['utf8','utf16le']){const dir=await recoveryFixture(t);await fs.writeFile(path.join(dir,'workspace.json'),Buffer.from('\uFEFF'+JSON.stringify({quiet:true,favorites:['project'],sessions:[]}),encoding));const w=await createWorkspace(dir);assert.equal(w.get().quiet,true);assert.deepEqual(w.get().favorites,['project']);assert.deepEqual(w.get().sessions,[]);await w.notify({message:'test'});const restored=await createWorkspace(dir);assert.equal(restored.get().quiet,true);}
+});
+
+test('damaged workspace restores a valid backup and preserves the original bytes',async t=>{
+ const dir=await recoveryFixture(t),file=path.join(dir,'workspace.json');const damaged='{"quiet":';await fs.writeFile(file,damaged);await fs.writeFile(file+'.bak',JSON.stringify({quiet:true,favorites:['saved']}));const w=await createWorkspace(dir);assert.equal(w.get().quiet,true);assert.deepEqual(w.get().favorites,['saved']);assert.equal(w.get().notifications[0].source,'activity');const copy=(await fs.readdir(dir)).find(n=>n.startsWith('workspace.json.damaged-'));assert.equal(await fs.readFile(path.join(dir,copy),'utf8'),damaged);assert.equal(JSON.parse(await fs.readFile(file,'utf8')).quiet,true);await w.preferences({quiet:false});assert.equal(JSON.parse(await fs.readFile(file+'.bak','utf8')).quiet,true);
+});
+
+test('empty or invalid workspace starts safely when no usable backup exists',async t=>{
+ for(const data of ['', 'null', '[]', '{"notifications":null}', '{"thresholds":{"cpu":null}}']){const dir=await recoveryFixture(t);await fs.writeFile(path.join(dir,'workspace.json'),data);const w=await createWorkspace(dir);assert.ok(Array.isArray(w.get().notifications));assert.equal(w.get().thresholds.cpu,90);assert.ok((await fs.readdir(dir)).some(n=>n.startsWith('workspace.json.damaged-')));await w.notify({message:'still works'});}
+});
+
+test('workspace recovers an interrupted first write from its temporary file',async t=>{
+ const dir=await recoveryFixture(t);await fs.writeFile(path.join(dir,'workspace.json.tmp'),JSON.stringify({favorites:['pending']}));const w=await createWorkspace(dir);assert.deepEqual(w.get().favorites,['pending']);assert.deepEqual((await createWorkspace(dir)).get().favorites,['pending']);
+});
